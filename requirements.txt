@@ -3,6 +3,5 @@ aiohttp
 aioredis
 cchardet
 gunicorn
-lz4
 motor
 uvloop

@@ -4,13 +4,13 @@
 from distutils.core import setup  
 
 
-PACKAGES = ["yueban"]
-NAME = "yueban"  
+PACKAGES = ["yueban3"]
+NAME = "yueban3"  
 DESCRIPTION = "A simple distributed game server framework"
 AUTHOR = "Yangbo"
 AUTHOR_EMAIL = "yangbo1024@qq.com"  
-URL = "https://github.com/yangbo1024/yueban_server"  
-VERSION = __import__("yueban").__version__
+URL = "https://github.com/yangbo1024/yueban3"  
+VERSION = __import__("yueban3").__version__
 CLASSIFIERS = [
     'License :: MIT License',
     'Development Status :: Release',
