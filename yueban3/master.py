@@ -270,6 +270,7 @@ async def _yueban_handler(request):
 async def initialize(cfg_path):
     configuration.init(cfg_path)
     await log.initialize()
+    await communicate.initialize()
     # web
     _web_app = web.Application()
     _web_app.router.add_get("/__ws", _websocket_handler)
