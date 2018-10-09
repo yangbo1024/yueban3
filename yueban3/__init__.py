@@ -19,21 +19,5 @@
         逻辑功能，可随时热更
 """
 
-import asyncio
-from . import configuration
-from . import log
-from . import cache
-from . import storage
+__version__ = "1.0.2"
 
-
-__version__ = "1.0.0"
-
-
-async def init_worker(cfg):
-    configuration.set_config(cfg)
-    await log.initialize()
-    tasks = [
-        cache.initialize(),
-        storage.initialize(),
-    ]
-    await asyncio.wait(tasks)

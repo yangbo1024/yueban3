@@ -267,23 +267,23 @@ async def _yueban_handler(request):
         log_error("error", e, s)
 
 
-async def initialize(cfg):
-    configuration.set_config(cfg)
+async def initialize(cfg_path):
+    configuration.init(cfg_path)
     await log.initialize()
+    # web
+    _web_app = web.Application()
+    _web_app.router.add_get("/__ws", _websocket_handler)
+    _web_app.router.add_post('/{path:.*}', _yueban_handler)
 
 
-def run(cfg, master_id):
+def run(cfg_path, master_id):
     global _web_app
     global _master_id
     _master_id = master_id
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(initialize(cfg))
-    # web
+    loop.run_until_complete(initialize(cfg_path))
     master_config = configuration.get_master_config()
     cfg = master_config[master_id]
     host = cfg['host']
     port = cfg['port']
-    _web_app = web.Application()
-    _web_app.router.add_get("/__ws", _websocket_handler)
-    _web_app.router.add_post('/{path:.*}', _yueban_handler)
     web.run_app(_web_app, host=host, port=port, access_log=None)

@@ -19,12 +19,14 @@ class MasterPath(object):
     CloseClient = "/__close_client"
     Schedule = "/__schedule"
     Hotfix = "/__hotfix"
+    ReloadConfig = "/__reload_config"
     
     
 class WorkerPath(object):
     Proto = "/__proto"
     ClientClosed = "/__client_closed"
     OnSchedule = "/__on_schedule"
+    ReloadConfig = "/__reload_config"
 
 
 def dumps(obj):

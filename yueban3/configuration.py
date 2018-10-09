@@ -4,6 +4,9 @@
 configuration
 """
 
+import json
+
+
 _config = {
     "redis": {
         "host": "123.123.123.123",
@@ -45,6 +48,21 @@ _config = {
         "name": "log",
     },
 }
+
+_config_file_path = "yueban.json"
+
+
+def reload_config():
+    global _config
+    with open(_config_file_path) as f:
+        bs = f.read()
+        _config = json.loads(bs)
+
+
+def init(path):
+    global _config_file_path
+    _config_file_path = path
+    reload_config()
 
 
 def set_config(cfg):

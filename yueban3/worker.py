@@ -4,6 +4,7 @@ worker-逻辑进程，可以热更新
 """
 
 import asyncio
+import json
 from aiohttp import web
 from . import utility
 from . import communicate
@@ -136,19 +137,19 @@ def get_worker_app():
     return _worker_app
 
 
-async def initialize(cfg, worker_app):
+async def initialize(cfg_path, worker_app):
     global _worker_app
     global _web_app
     if not isinstance(worker_app, Worker):
         raise TypeError("bad worker instance type")
     _worker_app = worker_app
-    _web_app = web.Application()
-    _web_app.router.add_get("/{path:.*}", _yueban_handler)
-    _web_app.router.add_post("/{path:.*}", _yueban_handler)
-    configuration.set_config(cfg)
+    configuration.init(cfg_path)
     await log.initialize()
     tasks = [
         cache.initialize(),
         storage.initialize(),
     ]
     await asyncio.wait(tasks)
+    _web_app = web.Application()
+    _web_app.router.add_get("/{path:.*}", _yueban_handler)
+    _web_app.router.add_post("/{path:.*}", _yueban_handler)
