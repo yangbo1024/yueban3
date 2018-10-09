@@ -46,13 +46,13 @@ class Client(object):
 
 
 def log_info(*args):
-    global _gate_id
-    log.info(_gate_id, *args)
+    global _master_id
+    log.info(_master_id, *args)
 
 
 def log_error(*args):
-    global _gate_id
-    log.error(_gate_id, *args)
+    global _master_id
+    log.error(_master_id, *args)
 
 
 def set_heartbeat_proto_id(c2s_id, s2c_id):
@@ -129,15 +129,15 @@ async def _recv_routine(client_obj, ws):
                     await q.put(reply_text)
                 else:
                     body = msg_object["body"]
-                    await communicate.call_worker(communicate.WorkerPath.Proto, [_gate_id, client_id, proto_id, body])
+                    await communicate.call_worker(communicate.WorkerPath.Proto, [_master_id, client_id, proto_id, body])
             else:
                 remove_client(client_id)
-                await communicate.call_worker(communicate.WorkerPath.ClientClosed, [_gate_id, client_id])
+                await communicate.call_worker(communicate.WorkerPath.ClientClosed, [_master_id, client_id])
                 break
         except Exception as e:
             remove_client(client_id)
             log_error('recv_routine_error', client_id, e, traceback.format_exc())
-            await communicate.call_worker(communicate.WorkerPath.ClientClosed, [_gate_id, client_id])
+            await communicate.call_worker(communicate.WorkerPath.ClientClosed, [_master_id, client_id])
             break
 
 
@@ -158,7 +158,7 @@ async def _websocket_handler(request):
     return ws
 
 
-# server to gate
+# worker-logic to master-gate
 async def _proto_handler(request):
     bs = await request.read()
     data = communicate.loads(bs)
@@ -237,13 +237,13 @@ async def _schedule_handler(request):
     return utility.pack_pickle_response('')
 
 
-def get_gate_id():
-    return _gate_id
-
-
-def set_gate_id(gate_id):
-    global _gate_id
-    _gate_id = gate_id
+async def _reload_config_handler(request):
+    try:
+        configuration.reload_config()
+        ret = "ok"
+    except:
+        ret = "fail"
+    return utility.pack_pickle_response(ret)
 
 
 _handlers = {
@@ -251,6 +251,7 @@ _handlers = {
     communicate.MasterPath.CloseClient: _close_client_handler,
     communicate.MasterPath.Hotfix: _hotfix_handler,
     communicate.MasterPath.Schedule: _schedule_handler,
+    communicate.MasterPath.ReloadConfig: _reload_config_handler,
 }
 
 

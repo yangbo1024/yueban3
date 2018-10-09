@@ -73,6 +73,13 @@ async def _yueban_handler(request):
         name, args = data
         await _worker_app.on_schedule(name, args)
         return utility.pack_pickle_response('')
+    elif path == communicate.WorkerPath.ReloadConfig:
+        try:
+            configuration.reload_config()
+            ret = "ok"
+        except:
+            ret = "fail"
+        return utility.pack_pickle_response(ret)
     else:
         return await _worker_app.on_request(request)
 
