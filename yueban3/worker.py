@@ -19,6 +19,7 @@ from . import storage
 _worker_app = None
 _web_app = None
 _worker_id = ""
+_grace_timeout = 5
 
 
 class ProtocolMessage(object):
@@ -137,14 +138,24 @@ def get_worker_app():
     return _worker_app
 
 
-async def initialize(cfg_path, worker_app):
+async def _on_shutdown():
+    if _grace_timeout <= 0:
+        return
+    await asyncio.sleep(_grace_timeout)
+    await communicate.cleanup()
+
+
+async def initialize(cfg_path, worker_app, grace_timeout=5):
     global _worker_app
     global _web_app
+    global _grace_timeout
     if not isinstance(worker_app, Worker):
         raise TypeError("bad worker instance type")
+    _grace_timeout = grace_timeout
     _worker_app = worker_app
     configuration.init(cfg_path)
     await log.initialize()
+    await communicate.initialize()
     tasks = [
         cache.initialize(),
         storage.initialize(),
@@ -153,3 +164,5 @@ async def initialize(cfg_path, worker_app):
     _web_app = web.Application()
     _web_app.router.add_get("/{path:.*}", _yueban_handler)
     _web_app.router.add_post("/{path:.*}", _yueban_handler)
+    _web_app.on_shutdown.append(_on_shutdown)
+    return _web_app

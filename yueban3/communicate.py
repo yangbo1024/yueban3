@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 
 """
-内部交互、调用
+交互、调用
 """
 
 import aiohttp
@@ -37,15 +37,25 @@ def loads(bs):
     return pickle.loads(bs)
 
 
-async def get_client_session():
+async def initialize():
     global _client_session
     _client_session = aiohttp.ClientSession()
+    return _client_session
+
+
+async def get_client_session():
+    """
+    请求尽量在一个全局session里发送
+    """
+    global _client_session
+    return _client_session
 
 
 async def cleanup():
     """
     清理
     """
+    global _client_session
     if not _client_session:
         return 
     await _client_session.close()
@@ -55,7 +65,8 @@ async def http_get(url):
     """
     HTTP GET请求
     """
-    async with _client_session.get(url) as resp:
+    session = _client_session
+    async with session.get(url) as resp:
         if resp.status != 200:
             raise RuntimeError('http_get:{},{}'.format(url, resp.status))
         return resp.status, await resp.read()
@@ -67,7 +78,8 @@ async def http_post(url, bs):
     发送：字节流
     接收: 字节流
     """
-    async with _client_session.post(url, data=bs) as resp:
+    session = _client_session
+    async with session.post(url, data=bs) as resp:
         if resp.status != 200:
             raise RuntimeError('http_post:{},{},{}'.format(url, bs, resp.status))
         bs = await resp.read()
