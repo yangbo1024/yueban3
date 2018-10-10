@@ -240,10 +240,10 @@ async def _schedule_handler(request):
 async def _reload_config_handler(request):
     try:
         configuration.reload_config()
-        ret = "ok"
+        ret = "success"
     except:
         ret = "fail"
-    return utility.pack_pickle_response(ret)
+    return utility.pack_json_response(ret)
 
 
 _handlers = {

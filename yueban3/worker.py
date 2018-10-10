@@ -73,13 +73,9 @@ async def _yueban_handler(request):
         name, args = data
         await _worker_app.on_schedule(name, args)
         return utility.pack_pickle_response('')
-    elif path == communicate.WorkerPath.ReloadConfig:
-        try:
-            configuration.reload_config()
-            ret = "ok"
-        except:
-            ret = "fail"
-        return utility.pack_pickle_response(ret)
+    elif path == communicate.WorkerPath.ProxyReloadConfig:
+        rets = await communicate.call_all_masters(communicate.MasterPath.ReloadConfig, None)
+        return utility.pack_pickle_response(rets)
     else:
         return await _worker_app.on_request(request)
 
