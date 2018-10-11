@@ -13,8 +13,8 @@ _config = {
         "port": 54321,
         "password": "password",
         "db": 0,
-        "min_size": 1,
-        "max_size": 2,
+        "min_pool_size": 1,
+        "max_pool_size": 2,
     },
     "mongodb": {
         "uri": "mongodb://username:password@host:port/database?replicaSet=test",

@@ -30,8 +30,8 @@ async def create_pool_of_config():
     port = cfg['port']
     password = cfg['password']
     db = cfg['db']
-    minsize = cfg['min_size']
-    maxsize = cfg['max_size']
+    minsize = cfg['min_pool_size']
+    maxsize = cfg['max_pool_size']
     return await create_pool(host, port, password, db, minsize, maxsize)
 
 
