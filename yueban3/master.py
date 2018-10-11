@@ -234,7 +234,7 @@ async def _schedule_handler(request):
     msg = communicate.loads(bs)
     seconds, name, args = msg
     asyncio.ensure_future(_future(seconds, name, args))
-    return utility.pack_pickle_response('')
+    return utility.pack_pickle_response(0)
 
 
 async def _reload_config_handler(request):

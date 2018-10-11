@@ -137,12 +137,7 @@ async def schedule_once(seconds, name, args):
     延迟回调
     """
     path = communicate.MasterPath.Schedule
-    master_config = configuration.get_master_config()
-    weights = {}
-    for master_id, cfg in master_config.items():
-        weights[master_id] = cfg["schedule_weight"]
-    target_master_id = utility.weight_rand_dict(weights)
-    await communicate.call_specific_master(target_master_id, path, [seconds, name, args])
+    await communicate.call_master(path, [seconds, name, args])
 
 
 def get_web_app():

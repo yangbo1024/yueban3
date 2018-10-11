@@ -28,8 +28,7 @@ _config = {
         "m1": {
             "host": "127.0.0.1",
             "port": 10001,
-            "url": "http://127.0.0.1:10001",
-            "schedule_weight": 1
+            "url": "http://127.0.0.1:10001"
         }
     },
     "worker": {
