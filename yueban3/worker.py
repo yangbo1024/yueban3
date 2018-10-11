@@ -15,6 +15,7 @@ from . import configuration
 from . import log
 from . import cache
 from . import storage
+from . import table
 
 
 _worker_app = None
@@ -168,6 +169,7 @@ async def initialize(cfg_path, worker_app, grace_timeout=5):
     configuration.init(cfg_path)
     await log.initialize()
     await communicate.initialize()
+    await table.initialize()
     tasks = [
         cache.initialize(),
         storage.initialize(),

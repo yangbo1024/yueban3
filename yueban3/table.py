@@ -76,10 +76,6 @@ def _get_newest_table_data(table_name):
 def update_table(table_name, table_data_str, encoding='utf-8'):
     """
     更新表，主要给系统接口用
-    :param table_name:
-    :param table_data_str:
-    :param encoding:
-    :return:
     """
     path = _get_table_path(table_name)
     with open(path, 'w', encoding=encoding) as f:
@@ -90,9 +86,6 @@ def update_table(table_name, table_data_str, encoding='utf-8'):
 def get_table(table_name, clone=True):
     """
     获取整个表数据
-    :param table_name:
-    :param clone:
-    :return:
     """
     data = _get_newest_table_data(table_name)
     return copy.deepcopy(data) if clone else data
@@ -101,11 +94,6 @@ def get_table(table_name, clone=True):
 def get_rows(table_name, index_name, index_value, clone=True):
     """
     获取能够匹配的所有行
-    :param table_name:
-    :param index_name:
-    :param index_value:
-    :param clone:
-    :return:
     """
     table_data = _get_newest_table_data(table_name)
     if not table_data:
@@ -117,11 +105,6 @@ def get_rows(table_name, index_name, index_value, clone=True):
 def get_row(table_name, index_name, index_value, clone=True):
     """
     获取1行
-    :param table_name:
-    :param index_name:
-    :param index_value:
-    :param clone:
-    :return:
     """
     table_data = _get_newest_table_data(table_name)
     if not table_data:
@@ -135,12 +118,6 @@ def get_row(table_name, index_name, index_value, clone=True):
 def get_cell(table_name, index_name, index_value, query_column, clone=True):
     """
     获取一个格子的内容
-    :param table_name:
-    :param index_name:
-    :param index_value:
-    :param query_column:
-    :param clone:
-    :return:
     """
     row_map = get_row(table_name, index_name, index_value)
     if not row_map:
