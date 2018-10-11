@@ -52,6 +52,7 @@ def get_log_file(category):
         dst = '{0}.{1}'.format(path, postfix)
         if not os.path.exists(dst):
             try:
+                # atomic
                 os.rename(src, dst)
             except Exception as e:
                 utility.print_out('rename log error', src, dst, e, category)

@@ -52,6 +52,13 @@ async def initialize():
     _redis_pool = await create_pool_of_config()
 
 
+async def cleanup():
+    global _redis_pool
+    if not _redis_pool:
+        return
+    await _redis_pool.close()
+
+
 def get_connection_pool():
     return _redis_pool
 

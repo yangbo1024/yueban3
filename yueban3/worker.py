@@ -130,7 +130,12 @@ async def schedule_once(seconds, name, args):
     延迟回调
     """
     path = communicate.MasterPath.Schedule
-    await communicate.call_master(path, [seconds, name, args])
+    master_config = configuration.get_master_config()
+    weights = {}
+    for master_id, cfg in master_config.items():
+        weights[master_id] = cfg["schedule_weight"]
+    target_master_id = utility.weight_rand_dict(weights)
+    await communicate.call_specific_master(target_master_id, path, [seconds, name, args])
 
 
 def get_web_app():
@@ -146,6 +151,8 @@ async def _on_shutdown():
         return
     await asyncio.sleep(_grace_timeout)
     await communicate.cleanup()
+    await cache.cleanup()
+    await storage.cleanup()
 
 
 async def initialize(cfg_path, worker_app, grace_timeout=5):

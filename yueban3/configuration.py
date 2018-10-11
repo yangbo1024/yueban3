@@ -14,23 +14,22 @@ _config = {
         "password": "password",
         "db": 0,
         "min_size": 1,
-        "max_size": 1,
+        "max_size": 2,
     },
     "mongodb": {
-        "host": "123.123.123.123",
-        "port": 54321,
-        "password": "password",
-        "user": "user",
-        "db": "db",
-        "replicaset": "",
-        "min_pool_size": 1,
-        "max_pool_size": 5,
+        "uri": "mongodb://username:password@host:port/database?replicaSet=test",
+        "db": "yueban",
+        "args": {
+            "minPoolSize": 1,
+            "maxPoolSize": 5,
+        }
     },
     "master": {
         "m1": {
             "host": "127.0.0.1",
             "port": 10001,
             "url": "http://127.0.0.1:10001",
+            "schedule_weight": 1,
         }
     },
     "worker": {
