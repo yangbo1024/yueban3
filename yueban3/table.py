@@ -19,9 +19,10 @@ _cached_tables = {}
 
 
 def _get_table_path(table_name):
-    table_file_name = table_name + '.json'
     table_config = configuration.get_table_config()
     table_data_dir = table_config["dir"]
+    ext = table_config["ext"]
+    table_file_name = table_name + ext
     path = os.path.join(table_data_dir, table_file_name)
     return path
 

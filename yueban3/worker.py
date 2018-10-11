@@ -10,6 +10,7 @@ from . import utility
 from . import communicate
 from abc import ABCMeta
 from abc import abstractmethod
+import traceback
 from . import configuration
 from . import log
 from . import cache
@@ -57,27 +58,32 @@ class Worker(object, metaclass=ABCMeta):
 
 async def _yueban_handler(request):
     path = request.path
-    if path == communicate.WorkerPath.Proto:
-        data = await utility.unpack_pickle_request(request)
-        client_id, path, body = data
-        msg_obj = ProtocolMessage(client_id, path, body)
-        await _worker_app.on_proto(msg_obj)
-        return utility.pack_pickle_response('')
-    elif path == communicate.WorkerPath.ClientClosed:
-        data = await utility.unpack_pickle_request(request)
-        client_id = data
-        await _worker_app.on_client_closed(client_id)
-        return utility.pack_pickle_response('')
-    elif path == communicate.WorkerPath.OnSchedule:
-        data = await utility.unpack_pickle_request(request)
-        name, args = data
-        await _worker_app.on_schedule(name, args)
-        return utility.pack_pickle_response('')
-    elif path == communicate.WorkerPath.ProxyReloadConfig:
-        rets = await communicate.call_all_masters(communicate.MasterPath.ReloadConfig, None)
-        return utility.pack_pickle_response(rets)
-    else:
-        return await _worker_app.on_request(request)
+    try:
+        if path == communicate.WorkerPath.Proto:
+            data = await utility.unpack_pickle_request(request)
+            client_id, path, body = data
+            msg_obj = ProtocolMessage(client_id, path, body)
+            await _worker_app.on_proto(msg_obj)
+            return utility.pack_pickle_response('')
+        elif path == communicate.WorkerPath.ClientClosed:
+            data = await utility.unpack_pickle_request(request)
+            client_id = data
+            await _worker_app.on_client_closed(client_id)
+            return utility.pack_pickle_response('')
+        elif path == communicate.WorkerPath.OnSchedule:
+            data = await utility.unpack_pickle_request(request)
+            name, args = data
+            await _worker_app.on_schedule(name, args)
+            return utility.pack_pickle_response('')
+        elif path == communicate.WorkerPath.ProxyReloadConfig:
+            rets = await communicate.call_all_masters(communicate.MasterPath.ReloadConfig, None)
+            return utility.pack_pickle_response(rets)
+        else:
+            return await _worker_app.on_request(request)
+    except Exception as e:
+        bs = await request.read()
+        ts = traceback.format_exc()
+        log.error("yueban_hander", path, bs, e, ts)
 
 
 async def unicast(client_id, proto_id, body):
@@ -105,7 +111,8 @@ async def multicast(client_ids, proto_id, body):
     tasks = []
     for master_id, mids in grouped_ids.items():
         task = communicate.call_specific_master(master_id, path, [mids, proto_id, body])
-    await asyncio.wait(task)
+        tasks.append(task)
+    await asyncio.wait(tasks)
 
 
 async def broadcast(proto_id, body):

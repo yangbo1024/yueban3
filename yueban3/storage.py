@@ -21,8 +21,12 @@ async def initialize():
     global _client
     cfg = configuration.get_mongodb_config()
     uri = cfg["uri"]
+    if not uri:
+        return
     kwargs = cfg["args"]
     _client = create_connection(uri, kwargs)
+    # 执行一次验证有没有连接成功
+    _client.admin.command('ismaster')
 
 
 async def cleanup():
@@ -30,7 +34,7 @@ async def cleanup():
     if not _client:
         return None
     await _client.close()
-    
+
 
 def get_client():
     return _client

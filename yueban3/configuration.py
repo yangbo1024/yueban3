@@ -29,23 +29,24 @@ _config = {
             "host": "127.0.0.1",
             "port": 10001,
             "url": "http://127.0.0.1:10001",
-            "schedule_weight": 1,
+            "schedule_weight": 1
         }
     },
     "worker": {
         "w1": {
             "host": "127.0.0.1",
             "port": 10102,
-            "url": "http://127.0.0.1:10002",
+            "url": "http://127.0.0.1:10002"
         }
     },
     "table": {
         "dir": "json_table",
+        "ext": ".json"
     },
     "log": {
         "dir": "logs",
-        "name": "log",
-    },
+        "name": "log"
+    }
 }
 
 _config_file_path = "yueban.json"
