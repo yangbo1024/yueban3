@@ -1,7 +1,8 @@
 # -*- coding:utf-8 -*-
 
 """
-Master
+Master-不支持重启
+可以保持客户端websocket长连接以及定时回调
 """
 
 from aiohttp import web
@@ -16,9 +17,9 @@ from . import log
 import pickle
 
 
-_c2s_heart_beat = globals().setdefault("_c2s_heart_beat", "_hb")
-_s2c_heart_beat = globals().setdefault("_s2c_heart_beat", "_hb")
-_max_idle_time = globals().setdefault("_max_idle_time", 60)
+SEND_QUEUE_SIZE = 128
+
+
 _web_app = globals().setdefault('_web_app')
 _master_id = globals().setdefault('_master_id', '')
 _clients = globals().setdefault('_clients', {})
@@ -36,9 +37,10 @@ class Client(object):
     """
     客户端对象，与客户端1：1存在
     """
-    def __init__(self, client_id, host):
+    def __init__(self, client_id, host, binary):
         self.client_id = client_id
         self.host = host
+        self.binary = binary
         self.send_task = None
         self.recv_task = None
         self.send_queue = None
@@ -55,21 +57,8 @@ def log_error(*args):
     log.error(_master_id, *args)
 
 
-def set_heartbeat_proto_id(c2s_id, s2c_id):
-    global _c2s_heart_beat
-    global _s2c_heart_beat
-    _c2s_heart_beat = c2s_id
-    _s2c_heart_beat = s2c_id
-    log_info("set_heartbeat_proto", c2s_id, s2c_id)
-
-
-def set_max_idle_time(sec):
-    global _max_idle_time
-    _max_idle_time = sec
-
-
-def _add_client(client_id, host):
-    client_obj = Client(client_id, host)
+def _add_client(client_id, host, binary):
+    client_obj = Client(client_id, host, binary)
     _clients[client_id] = client_obj
     return client_obj
 
@@ -82,7 +71,7 @@ def remove_client(client_id):
         client_obj.send_queue.put_nowait(None)
     except Exception as e:
         s = traceback.format_exc()
-        log_error("remove_client_error", e, s)
+        log_error("remove_client", e, s)
     _clients.pop(client_id)
     return True
 
@@ -95,12 +84,15 @@ async def _send_routine(client_obj, ws):
             msg = await queue.get()
             if msg is None:
                 # only in _remove_client can be None
-                log_info('send_queue_none', client_id)
+                log_info('sendq_none', client_id)
                 break
-            await ws.send_str(msg)
+            if client_obj.binary:
+                await ws.send_bytes(msg)
+            else:
+                await ws.send_str(msg)
         except Exception as e:
             remove_client(client_id)
-            log_error('send_routine_error', client_id, e, traceback.format_exc())
+            log_error('send_routine', client_id, e, traceback.format_exc())
             break
 
 
@@ -108,46 +100,53 @@ async def _recv_routine(client_obj, ws):
     """
     接收处理客户端协议
     """
+    master_config = configuration.get_master_config()
+    cfg = master_config[_master_id]
+    max_idle = cfg["max_idle"]
     client_id = client_obj.client_id
     while 1:
         try:
-            msg = await ws.receive(timeout=_max_idle_time)
-            if msg.type == web.WSMsgType.TEXT:
-                msg_object = json.loads(msg.data)
-                proto_id = msg_object["id"]
-                echo = msg_object.get("echo", "")
-                if proto_id == _s2c_heart_beat:
-                    # 心跳协议直接在网关处理
-                    q = client_obj.send_queue
-                    msg_reply = {
-                        "id": _s2c_heart_beat,
-                        "body": {},
-                        "time": time.time(),
-                        "echo": echo,
-                    }
-                    reply_text = json.dumps(msg_reply)
-                    await q.put(reply_text)
-                else:
-                    body = msg_object["body"]
-                    await communicate.call_worker(communicate.WorkerPath.Proto, [_master_id, client_id, proto_id, body])
+            msg = await ws.receive(timeout=max_idle)
+            # auto ping&pong, 所以只有消息包会收到
+            if msg.type in (web.WSMsgType.TEXT, web.WSMsgType.BINARY):
+                args = {
+                    "id": client_id,
+                    "host": client_obj.host,
+                    "data": msg.data,
+                }
+                await communicate.call_worker(communicate.WorkerPath.Proto, args)
+            elif msg.type in (web.WSMsgType.PING, web.WSMsgType.PONG):
+                # 兼容框架
+                continue
             else:
                 remove_client(client_id)
-                await communicate.call_worker(communicate.WorkerPath.ClientClosed, [_master_id, client_id])
+                args = {
+                    "id": client_id,
+                    "host": client_obj.host,
+                }
+                await communicate.call_worker(communicate.WorkerPath.ClientClosed, args)
                 break
         except Exception as e:
             remove_client(client_id)
             log_error('recv_routine_error', client_id, e, traceback.format_exc())
-            await communicate.call_worker(communicate.WorkerPath.ClientClosed, [_master_id, client_id])
+            args = {
+                "id": client_id,
+                "host": client_obj.host,
+            }
+            await communicate.call_worker(communicate.WorkerPath.ClientClosed, args)
             break
 
 
-async def _websocket_handler(request):
-    ws = web.WebSocketResponse()
+async def _websocket_handler(request, binary):
+    master_config = configuration.get_master_config()
+    cfg = master_config[_master_id]
+    _heartbeat = cfg["heartbeat"]
+    ws = web.WebSocketResponse(heartbeat=_heartbeat)
     await ws.prepare(request)
     client_host = request.headers.get("X-Real-IP") or request.remote
     client_id = gen_client_id()
-    client_obj = _add_client(client_id, client_host)
-    client_obj.send_queue = asyncio.Queue(128)
+    client_obj = _add_client(client_id, client_host, binary)
+    client_obj.send_queue = asyncio.Queue(SEND_QUEUE_SIZE)
     send_task = asyncio.ensure_future(_send_routine(client_obj, ws))
     recv_task = asyncio.ensure_future(_recv_routine(client_obj, ws))
     client_obj.send_task = send_task
@@ -155,48 +154,49 @@ async def _websocket_handler(request):
     log_info('begin', client_id, client_host, len(_clients))
     await asyncio.wait([send_task, recv_task], return_when=asyncio.FIRST_COMPLETED)
     log_info("end", client_id, len(_clients))
+    try:
+        await ws.close()
+    except asyncio.CancelledError:
+        log_error("ws cancelled", client_id)
+    else:
+        pass
     return ws
+
+
+async def _ws_str_handler(request):
+    return await _websocket_handler(request, False)
+
+
+async def _ws_bin_handler(request):
+    return await _websocket_handler(request, True)
 
 
 # worker-logic to master-gate
 async def _proto_handler(request):
-    bs = await request.read()
-    data = communicate.loads(bs)
-    client_ids, proto_id, body = data
+    msg = await utility.unpack_pickle_request(request)
+    client_ids = msg["ids"]
+    data = msg["data"]
     if not client_ids:
         # broadcast
         client_ids = _clients.keys()
-    try:
-        msg_object = {
-            "id": proto_id,
-            "body": body,
-            "time": time.time(),
-        }
-        msg = json.dumps(msg_object)
-    except Exception as e:
-        s = traceback.format_exc()
-        log_error("proto_dump_error", client_ids, proto_id, body, e, s)
-        return
     for client_id in client_ids:
         client_obj = _clients.get(client_id)
         if not client_obj:
             continue
         try:
             q = client_obj.send_queue
-            q.put_nowait(msg)            
+            q.put_nowait(data)            
         except Exception as e:
             s = traceback.format_exc()
-            log_error("proto_handler_error", client_id, proto_id, body, e, s)
+            log_error("proto_handler", client_id, data, e, s)
     return utility.pack_pickle_response('')
 
 
 async def _close_client_handler(request):
-    bs = await request.read()
-    data = communicate.loads(bs)
-    client_ids = data
-    for client_id in client_ids:
-        remove_client(client_id)
-    return utility.pack_pickle_response('')
+    msg = await utility.unpack_pickle_request(request)
+    client_id = msg["id"]
+    ok = remove_client(client_id)
+    return utility.pack_pickle_response(ok)
 
 
 async def _hotfix_handler(request):
@@ -221,7 +221,11 @@ async def _future(seconds, name, args):
     await asyncio.sleep(seconds)
     try:
         path = communicate.WorkerPath.OnSchedule
-        await communicate.call_worker(path, [name, args])
+        msg = {
+            "name": name,
+            "args": args,
+        }
+        await communicate.call_worker(path, msg)
     except Exception as e:
         import traceback
         await log_error('schedule_error', name, args, e, traceback.format_exc())
@@ -230,10 +234,11 @@ async def _future(seconds, name, args):
 
 
 async def _schedule_handler(request):
-    bs = await request.read()
-    msg = communicate.loads(bs)
-    seconds, name, args = msg
-    asyncio.ensure_future(_future(seconds, name, args))
+    msg = await utility.unpack_pickle_request(request)
+    duration = msg["duration"]
+    name = msg["name"]
+    args = msg["args"]
+    asyncio.ensure_future(_future(duration, name, args))
     return utility.pack_pickle_response(0)
 
 
@@ -274,7 +279,8 @@ async def initialize(cfg_path):
     await communicate.initialize()
     # web
     _web_app = web.Application()
-    _web_app.router.add_get("/__ws", _websocket_handler)
+    _web_app.router.add_get("/ws_str", _ws_str_handler)
+    _web_app.router.add_get("/ws_bin", _ws_bin_handler)
     _web_app.router.add_post('/{path:.*}', _yueban_handler)
 
 

@@ -14,21 +14,23 @@ _config = {
         "password": "password",
         "db": 0,
         "min_pool_size": 1,
-        "max_pool_size": 2,
+        "max_pool_size": 2
     },
     "mongodb": {
         "uri": "mongodb://username:password@host:port/database?replicaSet=test",
         "db": "yueban",
         "args": {
             "minPoolSize": 1,
-            "maxPoolSize": 5,
+            "maxPoolSize": 5
         }
     },
     "master": {
         "m1": {
             "host": "127.0.0.1",
             "port": 10001,
-            "url": "http://127.0.0.1:10001"
+            "url": "http://127.0.0.1:10001",
+            "heartbeat": 10,
+            "max_idle": 60
         }
     },
     "worker": {
@@ -53,9 +55,9 @@ _config_file_path = "yueban.json"
 
 def reload_config():
     global _config
-    with open(_config_file_path) as f:
-        bs = f.read()
-        _config = json.loads(bs)
+    with open(_config_file_path, encoding="utf-8") as f:
+        s = f.read()
+        _config = json.loads(s)
 
 
 def init(path):

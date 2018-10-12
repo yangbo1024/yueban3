@@ -23,7 +23,7 @@ async def create_pool(host, port, password, db, minsize, maxsize):
     return await aioredis.create_redis_pool((host, port), db=db, password=password, minsize=minsize, maxsize=maxsize)
 
 
-async def create_pool_of_config():
+async def initialize():
     global _redis_pool
     cfg = configuration.get_redis_config()
     host = cfg['host']
@@ -32,24 +32,7 @@ async def create_pool_of_config():
     db = cfg['db']
     minsize = cfg['min_pool_size']
     maxsize = cfg['max_pool_size']
-    return await create_pool(host, port, password, db, minsize, maxsize)
-
-
-async def create_pool_with_custom_size(minsize, maxsize):
-    global _redis_pool
-    cfg = configuration.get_redis_config()
-    host = cfg['host']
-    if not host:
-        return None
-    port = cfg['port']
-    password = cfg['password']
-    db = cfg['db']
-    return await create_pool(host, port, password, db, minsize, maxsize)
-
-
-async def initialize():
-    global _redis_pool
-    _redis_pool = await create_pool_of_config()
+    _redis_pool = await create_pool(host, port, password, db, minsize, maxsize)
 
 
 async def cleanup():
@@ -87,7 +70,11 @@ class Lock(object):
     end
     """
 
-    def __init__(self, lock_name, timeout=5.0, interval=0.01, lua_valid=True):
+    def __init__(self, lock_name, timeout=5.0, interval=0.01, lua_valid=False):
+        """
+        开启lua可以在解锁时只请求1次；否则请求2次；
+        因为主流云服务的redis对lua支持不好，所以默认关闭，避免调用失败
+        """
         from . import utility
         self.lock_key = make_key(SYS_KEY_PREFIX, lock_name)
         self.lock_id = utility.gen_uniq_id()
