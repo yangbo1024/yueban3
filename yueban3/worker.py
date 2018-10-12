@@ -1,6 +1,8 @@
 # -*- coding:utf-8 -*-
 """
-worker-逻辑进程，可以热更新
+worker-逻辑进程
+通过gunicorn启动，
+可以热更新
 """
 
 import asyncio

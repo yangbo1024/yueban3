@@ -2,7 +2,7 @@
 
 """
 Master-不支持重启
-可以保持客户端websocket长连接以及定时回调
+可以保持客户端websocket长连接，以及定时回调
 """
 
 from aiohttp import web
