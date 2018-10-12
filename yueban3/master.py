@@ -79,6 +79,7 @@ def remove_client(client_id):
 async def _send_routine(client_obj, ws):
     client_id = client_obj.client_id
     queue = client_obj.send_queue
+    msg = None
     while 1:
         try:
             msg = await queue.get()
@@ -92,7 +93,7 @@ async def _send_routine(client_obj, ws):
                 await ws.send_str(msg)
         except Exception as e:
             remove_client(client_id)
-            log_error('send_routine', client_id, e, traceback.format_exc())
+            log_error('send_routine', client_id, msg, e, traceback.format_exc())
             break
 
 
@@ -128,7 +129,7 @@ async def _recv_routine(client_obj, ws):
                 break
         except Exception as e:
             remove_client(client_id)
-            log_error('recv_routine_error', client_id, e, traceback.format_exc())
+            log_error('recv_routine', client_id, e, traceback.format_exc())
             args = {
                 "id": client_id,
                 "host": client_obj.host,
@@ -151,9 +152,9 @@ async def _websocket_handler(request, binary):
     recv_task = asyncio.ensure_future(_recv_routine(client_obj, ws))
     client_obj.send_task = send_task
     client_obj.recv_task = recv_task
-    log_info('begin', client_id, client_host, len(_clients))
+    log_info('begin', client_id, client_host, len(_clients), _schedule_cnt)
     await asyncio.wait([send_task, recv_task], return_when=asyncio.FIRST_COMPLETED)
-    log_info("end", client_id, len(_clients))
+    log_info("end", client_id, len(_clients), _schedule_cnt)
     try:
         await ws.close()
     except asyncio.CancelledError:
