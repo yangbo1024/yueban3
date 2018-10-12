@@ -190,7 +190,7 @@ async def _proto_handler(request):
         except Exception as e:
             s = traceback.format_exc()
             log_error("proto_handler", client_id, data, e, s)
-    return utility.pack_pickle_response('')
+    return utility.pack_pickle_response("")
 
 
 async def _close_client_handler(request):

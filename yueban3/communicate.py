@@ -43,7 +43,7 @@ async def initialize():
     return _client_session
 
 
-async def get_client_session():
+def get_client_session():
     """
     请求尽量在一个全局session里发送
     """
