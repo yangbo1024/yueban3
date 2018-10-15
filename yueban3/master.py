@@ -37,10 +37,9 @@ class Client(object):
     """
     客户端对象，与客户端1：1存在
     """
-    def __init__(self, client_id, host, binary):
+    def __init__(self, client_id, host):
         self.client_id = client_id
         self.host = host
-        self.binary = binary
         self.send_task = None
         self.recv_task = None
         self.send_queue = None
@@ -57,8 +56,8 @@ def log_error(*args):
     log.error(_master_id, *args)
 
 
-def _add_client(client_id, host, binary):
-    client_obj = Client(client_id, host, binary)
+def _add_client(client_id, host):
+    client_obj = Client(client_id, host)
     _clients[client_id] = client_obj
     return client_obj
 
@@ -87,10 +86,12 @@ async def _send_routine(client_obj, ws):
                 # only in _remove_client can be None
                 log_info('sendq_none', client_id)
                 break
-            if client_obj.binary:
+            if isinstance(msg, str):
+                await ws.send_str(msg)
+            elif isinstance(msg, bytes):
                 await ws.send_bytes(msg)
             else:
-                await ws.send_str(msg)
+                raise TypeError("unknown msg type")
         except Exception as e:
             remove_client(client_id)
             log_error('send_routine', client_id, msg, e, traceback.format_exc())
@@ -113,6 +114,7 @@ async def _recv_routine(client_obj, ws):
                 args = {
                     "id": client_id,
                     "host": client_obj.host,
+                    "type": msg.type,
                     "data": msg.data,
                 }
                 await communicate.call_worker(communicate.WorkerPath.Proto, args)
@@ -138,15 +140,18 @@ async def _recv_routine(client_obj, ws):
             break
 
 
-async def _websocket_handler(request, binary):
+async def _websocket_handler(request):
     master_config = configuration.get_master_config()
     cfg = master_config[_master_id]
     _heartbeat = cfg["heartbeat"]
-    ws = web.WebSocketResponse(heartbeat=_heartbeat)
+    if _heartbeat <= 0:
+        ws = web.WebSocketResponse()
+    else:
+        ws = web.WebSocketResponse(heartbeat=_heartbeat)
     await ws.prepare(request)
     client_host = request.headers.get("X-Real-IP") or request.remote
     client_id = gen_client_id()
-    client_obj = _add_client(client_id, client_host, binary)
+    client_obj = _add_client(client_id, client_host)
     client_obj.send_queue = asyncio.Queue(SEND_QUEUE_SIZE)
     send_task = asyncio.ensure_future(_send_routine(client_obj, ws))
     recv_task = asyncio.ensure_future(_recv_routine(client_obj, ws))
@@ -162,14 +167,6 @@ async def _websocket_handler(request, binary):
     else:
         pass
     return ws
-
-
-async def _ws_str_handler(request):
-    return await _websocket_handler(request, False)
-
-
-async def _ws_bin_handler(request):
-    return await _websocket_handler(request, True)
 
 
 # worker-logic to master-gate
@@ -280,8 +277,7 @@ async def initialize(cfg_path):
     await communicate.initialize()
     # web
     _web_app = web.Application()
-    _web_app.router.add_get("/ws_str", _ws_str_handler)
-    _web_app.router.add_get("/ws_bin", _ws_bin_handler)
+    _web_app.router.add_get("/__ws", _websocket_handler)
     _web_app.router.add_post('/{path:.*}', _yueban_handler)
 
 
