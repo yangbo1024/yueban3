@@ -12,6 +12,7 @@ from . import configuration
 import os
 import os.path
 import copy
+from . import log
 
 
 _cached_mtimes = {}
@@ -66,10 +67,9 @@ def _get_newest_table_data(table_name):
                 _cached_tables[table_name] = table_data
             return table_data
     except Exception as e:
-        from . import utility
         import traceback
         s = traceback.format_exc()
-        utility.print_out("get_newest_table_error", table_name, e, s)
+        log.error("get_newest_table_error", table_name, e, s)
         raise e
 
 

@@ -95,17 +95,15 @@ class Lock(object):
                 p_sum_time += p_interval
                 continue
             return self
-        from . import utility
-        utility.print_out("lock failed", self.lock_key, self.lock_id, self.timeout)
+        log.error("lock failed", self.lock_key, self.lock_id, self.timeout)
         return None
 
     async def __aexit__(self, exc_type, exc, tb):
         if exc_type:
             import traceback
-            from . import utility
             el = traceback.format_exception(exc_type, exc, tb)
             es = "".join(el)
-            utility.print_out('lock_exc_error:\n', es)
+            log.error('lock_exc_error:\n', es)
         if self.lua_valid:
             await _redis_pool.eval(self.UNLOCK_SCRIPT, keys=[self.lock_key], args=[self.lock_id])
         else:
