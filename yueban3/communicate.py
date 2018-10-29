@@ -61,25 +61,25 @@ async def cleanup():
     await _client_session.close()
 
 
-async def http_get(url):
+async def http_get(url, timeout=10):
     """
     HTTP GET请求
     """
     session = _client_session
-    async with session.get(url) as resp:
+    async with session.get(url, timeout=timeout) as resp:
         if resp.status != 200:
             raise RuntimeError('http_get:{},{}'.format(url, resp.status))
         return resp.status, await resp.read()
 
 
-async def http_post(url, bs):
+async def http_post(url, bs, timeout=10):
     """
     HTTP POST请求
     发送：字节流
     接收: 字节流
     """
     session = _client_session
-    async with session.post(url, data=bs) as resp:
+    async with session.post(url, data=bs, timeout=timeout) as resp:
         if resp.status != 200:
             raise RuntimeError('http_post:{},{},{}'.format(url, bs, resp.status))
         bs = await resp.read()

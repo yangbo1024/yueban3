@@ -83,7 +83,7 @@ async def _send_routine(client_obj, ws):
         try:
             msg = await queue.get()
             if msg is None:
-                # only in _remove_client can be None
+                # only in remove_client can be None
                 log_info('sendq_none', client_id)
                 break
             if isinstance(msg, str):

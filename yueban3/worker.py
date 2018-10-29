@@ -38,7 +38,7 @@ class ProtocolMessage(object):
         self.data = data
 
     def __str__(self):
-        return 'ProtocolMessage(host={1},client_id={2},data={3}'.format(
+        return 'ProtocolMessage(host={0},client_id={1},data={2}'.format(
             self.host, self.client_id, self.data
         )
 
@@ -190,9 +190,8 @@ def get_worker_app():
 
 
 async def _on_shutdown():
-    if _grace_timeout <= 0:
-        return
-    await asyncio.sleep(_grace_timeout)
+    if _grace_timeout > 0:
+        await asyncio.sleep(_grace_timeout)
     await communicate.cleanup()
     await cache.cleanup()
     await storage.cleanup()
