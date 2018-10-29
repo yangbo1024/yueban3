@@ -165,7 +165,7 @@ async def close_client(client_id):
     msg = {
         "id": client_id,
     }
-    await communicate.call_specific_master(master_id, path, msg)
+    return await communicate.call_specific_master(master_id, path, msg)
 
 
 async def schedule_once(seconds, name, args):
