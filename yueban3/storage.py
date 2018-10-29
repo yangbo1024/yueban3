@@ -25,7 +25,7 @@ async def initialize():
     if not uri:
         return
     kwargs = cfg["args"]
-    _client = create_connection(uri, kwargs)
+    _client = await create_connection(uri, kwargs)
     # 执行一次验证有没有连接成功
     await _client.admin.command('ismaster')
 
