@@ -107,6 +107,7 @@ async def _yueban_handler(request):
         bs = await request.read()
         ts = traceback.format_exc()
         log.error("yueban_hander", path, bs, e, ts)
+        return utility.pack_pickle_response('')
 
 
 async def unicast(client_id, data):
@@ -194,7 +195,7 @@ def get_worker_app():
 async def _on_shutdown():
     if _grace_timeout > 0:
         await asyncio.sleep(_grace_timeout)
-    await communicate.cleanup()
+    # await communicate.cleanup()
     await cache.cleanup()
     await storage.cleanup()
 
