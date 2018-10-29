@@ -31,9 +31,10 @@ class ProtocolMessage(object):
     长连接协议收到的数据包封装对象
     data可以是二进制也可能是文本
     """
-    def __init__(self, host, client_id, data):
+    def __init__(self, host, client_id, msg_type, data):
         self.host = host
         self.client_id = client_id
+        self.msg_type = msg_type
         self.data = data
 
     def __str__(self):
@@ -78,9 +79,10 @@ async def _yueban_handler(request):
         if path == communicate.WorkerPath.Proto:
             msg = await utility.unpack_pickle_request(request)
             client_id = msg["id"]
+            msg_type = msg["type"]
             data = msg["data"]
             host = msg["host"]
-            msg_obj = ProtocolMessage(host, client_id, data)
+            msg_obj = ProtocolMessage(host, client_id, msg_type, data)
             await _worker_app.on_proto(msg_obj)
             return utility.pack_pickle_response('')
         elif path == communicate.WorkerPath.ClientClosed:
