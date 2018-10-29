@@ -75,6 +75,18 @@ def remove_client(client_id):
     return True
 
 
+def _put_s2c(client_id, data):
+    client_obj = _clients.get(client_id)
+    if not client_obj:
+        return
+    try:
+        q = client_obj.send_queue
+        q.put_nowait(data)            
+    except Exception as e:
+        s = traceback.format_exc()
+        log_error("put_s2c", client_id, data, e, s)
+
+
 async def _send_routine(client_obj, ws):
     client_id = client_obj.client_id
     queue = client_obj.send_queue
@@ -117,7 +129,9 @@ async def _recv_routine(client_obj, ws):
                     "type": msg.type,
                     "data": msg.data,
                 }
-                await communicate.call_worker(communicate.WorkerPath.Proto, args)
+                data = await communicate.call_worker(communicate.WorkerPath.Proto, args)
+                if data is not None:
+                    _put_s2c(client_id, data)
             elif msg.type in (web.WSMsgType.PING, web.WSMsgType.PONG):
                 # 兼容框架
                 continue
@@ -178,15 +192,7 @@ async def _proto_handler(request):
         # broadcast
         client_ids = _clients.keys()
     for client_id in client_ids:
-        client_obj = _clients.get(client_id)
-        if not client_obj:
-            continue
-        try:
-            q = client_obj.send_queue
-            q.put_nowait(data)            
-        except Exception as e:
-            s = traceback.format_exc()
-            log_error("proto_handler", client_id, data, e, s)
+        _put_s2c(client_id, data)
     return utility.pack_pickle_response("")
 
 
@@ -275,7 +281,6 @@ async def _initialize(cfg_path):
     global _web_app
     configuration.init(cfg_path)
     await log.initialize()
-    await communicate.initialize()
     # web
     _web_app = web.Application()
     _web_app.router.add_get("/ws", _websocket_handler)

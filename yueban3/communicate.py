@@ -62,23 +62,26 @@ async def cleanup():
     await _client_session.close()
 
 
-async def http_get(url, timeout=10):
+async def master_post(url, bs, timeout=10):
     """
-    HTTP GET请求
+    master POST请求，不用连接池，避免一直发送数据导致worker不能因为keep-alive连接graceful shutdown
+    发送：字节流
+    接收: 字节流
     """
-    session = _client_session
     try:
-        async with session.get(url, timeout=timeout) as resp:
-            if resp.status != 200:
-                raise RuntimeError('http_get:{},{}'.format(url, resp.status))
-            return resp.status, await resp.read()
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, data=bs, timeout=timeout) as resp:
+                if resp.status != 200:
+                    raise RuntimeError('http_post:{},{},{}'.format(url, bs, resp.status))
+                bs = await resp.read()
+                return bs
     except Exception as e:
-        log.error("http_get", e, url)
+        log.error("http_post", url, bs, e)
 
 
-async def http_post(url, bs, timeout=10):
+async def worker_post(url, bs, timeout=10):
     """
-    HTTP POST请求
+    HTTP POST请求，使用连接池
     发送：字节流
     接收: 字节流
     """
@@ -102,7 +105,7 @@ async def call_specific_master(master_id, path, args):
     base_url = cfg["url"]
     url = '{0}{1}'.format(base_url, path)
     bs = dumps(args)
-    bs = await http_post(url, bs)
+    bs = await worker_post(url, bs)
     return loads(bs)
 
 
@@ -140,7 +143,7 @@ async def call_worker(path, args):
     base_url = cfg["url"]
     url = '{0}{1}'.format(base_url, path)
     bs = dumps(args)
-    bs = await http_post(url, bs)
+    bs = await master_post(url, bs)
     return loads(bs)
 
 

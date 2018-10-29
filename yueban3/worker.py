@@ -62,6 +62,7 @@ class Worker(object, metaclass=ABCMeta):
     async def on_proto(self, message):
         """
         message是ProtocolMessage对象
+        如果返回对象不为None，则作为应答数据返回给客户端
         """
         pass
 
@@ -83,8 +84,9 @@ async def _yueban_handler(request):
             data = msg["data"]
             host = msg["host"]
             msg_obj = ProtocolMessage(host, client_id, msg_type, data)
-            await _worker_app.on_proto(msg_obj)
-            return utility.pack_pickle_response('')
+            data = await _worker_app.on_proto(msg_obj)
+            # data不为None表示有应答数据，一应一答的场景下可以省掉调用master的开销
+            return utility.pack_pickle_response(data)
         elif path == communicate.WorkerPath.ClientClosed:
             msg = await utility.unpack_pickle_request(request)
             client_id = msg["id"]
