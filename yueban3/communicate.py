@@ -9,6 +9,7 @@ import asyncio
 from . import configuration
 import pickle
 import random
+from . import log
 
 
 _client_session = None
@@ -66,10 +67,13 @@ async def http_get(url, timeout=10):
     HTTP GET请求
     """
     session = _client_session
-    async with session.get(url, timeout=timeout) as resp:
-        if resp.status != 200:
-            raise RuntimeError('http_get:{},{}'.format(url, resp.status))
-        return resp.status, await resp.read()
+    try:
+        async with session.get(url, timeout=timeout) as resp:
+            if resp.status != 200:
+                raise RuntimeError('http_get:{},{}'.format(url, resp.status))
+            return resp.status, await resp.read()
+    except Exception as e:
+        log.error("http_get", e, url)
 
 
 async def http_post(url, bs, timeout=10):
@@ -79,11 +83,14 @@ async def http_post(url, bs, timeout=10):
     接收: 字节流
     """
     session = _client_session
-    async with session.post(url, data=bs, timeout=timeout) as resp:
-        if resp.status != 200:
-            raise RuntimeError('http_post:{},{},{}'.format(url, bs, resp.status))
-        bs = await resp.read()
-        return bs
+    try:
+        async with session.post(url, data=bs, timeout=timeout) as resp:
+            if resp.status != 200:
+                raise RuntimeError('http_post:{},{},{}'.format(url, bs, resp.status))
+            bs = await resp.read()
+            return bs
+    except Exception as e:
+        log.error("http_post", url, bs, e)
 
 
 async def call_specific_master(master_id, path, args):
