@@ -206,21 +206,15 @@ async def initialize(cfg_path, worker_app, grace_timeout=5):
         raise TypeError("bad worker instance type")
     _grace_timeout = grace_timeout
     _worker_app = worker_app
-    try:
-        configuration.init(cfg_path)
-        await log.initialize()
-        await communicate.initialize()
-        await table.initialize()
-        tasks = [
-            cache.initialize(),
-            storage.initialize(),
-        ]
-        await asyncio.wait(tasks)
-    except Exception as e:
-        s = traceback.format_exc()
-        log.error("initialize failed", cfg_path, e, s)
-        import sys
-        sys.exit(1)
+    configuration.init(cfg_path)
+    await log.initialize()
+    await communicate.initialize()
+    await table.initialize()
+    tasks = [
+        cache.initialize(),
+        storage.initialize(),
+    ]
+    await asyncio.gather(*tasks)
     _web_app = web.Application()
     _web_app.router.add_get("/{path:.*}", _yueban_handler)
     _web_app.router.add_post("/{path:.*}", _yueban_handler)
