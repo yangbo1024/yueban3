@@ -154,7 +154,7 @@ async def unpack_json_request(request):
 
 
 def pack_json_response(data):
-    bs = json.dumps(data)
+    bs = json.dumps(data, separators=(",", ":"))
     return web.Response(body=bs)
 
 
