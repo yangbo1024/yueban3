@@ -71,11 +71,11 @@ class Lock(object):
     end
     """
     # 可以根据需求启用lua
-    lua_valid = False
+    lua_valid = True
     def __init__(self, lock_name, timeout=5.0, retry_interval=0.01, lua_valid=None):
         """
         开启lua可以在解锁时只请求1次；否则请求2次；
-        因为主流云服务的redis对lua支持不好，所以默认关闭，避免调用失败
+        因为主流云服务的redis对lua支持不好，所以注意选择是否禁用lua，避免调用失败
         """
         from . import utility
         self.lock_key = make_key(SYS_KEY_PREFIX, lock_name)
