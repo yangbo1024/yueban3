@@ -44,6 +44,9 @@ class ProtocolMessage(object):
 
 
 class Worker(object, metaclass=ABCMeta):
+    def __init__(self, worker_id):
+        self.worker_id = worker_id
+
     @abstractmethod
     async def on_request(self, request):
         """
@@ -200,7 +203,7 @@ async def _on_shutdown():
     await storage.cleanup()
 
 
-async def initialize(cfg_path, worker_app, grace_timeout=5):
+async def _initialize(cfg_path, worker_app, grace_timeout):
     global _worker_app
     global _web_app
     global _grace_timeout
@@ -222,3 +225,16 @@ async def initialize(cfg_path, worker_app, grace_timeout=5):
     _web_app.router.add_post("/{path:.*}", _yueban_handler)
     _web_app.on_shutdown.append(_on_shutdown)
     return _web_app
+
+
+def run(cfg_path, worker_app, grace_timeout=2):
+    global _web_app
+    import uvloop
+    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(_initialize(cfg_path, worker_app, grace_timeout))
+    worker_cfg = configuration.get_worker_config()
+    cfg = worker_cfg[worker_app.worker_id]
+    host = cfg["host"]
+    port = cfg["port"]
+    web.run_app(_web_app, host=host, port=port, reuse_address=True, reuse_port=True)

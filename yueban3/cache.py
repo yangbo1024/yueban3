@@ -39,7 +39,8 @@ async def cleanup():
     global _redis_pool
     if not _redis_pool:
         return
-    await _redis_pool.close()
+    _redis_pool.close()
+    await _redis_pool.wait_closed()
 
 
 def get_connection_pool():
@@ -70,7 +71,7 @@ class Lock(object):
     end
     """
 
-    def __init__(self, lock_name, timeout=5.0, interval=0.01, lua_valid=False):
+    def __init__(self, lock_name, timeout=5.0, retry_interval=0.01, lua_valid=False):
         """
         开启lua可以在解锁时只请求1次；否则请求2次；
         因为主流云服务的redis对lua支持不好，所以默认关闭，避免调用失败
@@ -79,7 +80,7 @@ class Lock(object):
         self.lock_key = make_key(SYS_KEY_PREFIX, lock_name)
         self.lock_id = utility.gen_uniq_id()
         self.timeout = max(0.02, timeout)
-        self.interval = max(0.001, interval)
+        self.interval = max(0.001, retry_interval)
         self.lua_valid = lua_valid
 
     async def __aenter__(self):
@@ -95,15 +96,16 @@ class Lock(object):
                 p_sum_time += p_interval
                 continue
             return self
-        log.error("lock failed", self.lock_key, self.lock_id, self.timeout)
-        return None
+        msg = "lock failed:{} {} {}".format(self.lock_key, self.lock_id, self.timeout)
+        log.error(msg)
+        raise RuntimeError(msg)
 
     async def __aexit__(self, exc_type, exc, tb):
         if exc_type:
             import traceback
             el = traceback.format_exception(exc_type, exc, tb)
             es = "".join(el)
-            log.error('lock_exc_error:\n', es)
+            log.error('lock_exc_error:\n', self.lock_key, es)
         if self.lua_valid:
             await _redis_pool.eval(self.UNLOCK_SCRIPT, keys=[self.lock_key], args=[self.lock_id])
         else:

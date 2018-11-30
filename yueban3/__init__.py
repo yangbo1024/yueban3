@@ -1,15 +1,15 @@
 # -*- coding:utf-8 -*-
 """
 框架:
-    基于aiohttp，aioredis, motor
+    基于Python 3.5+, aiohttp，aioredis, motor
 
 配置：
     参见configuration.py配置模板
 
 特点:
     无状态
-    一个redis做cache
-    一个mongodb做数据存储
+    redis做cache
+    mongodb做数据存储
     日志按天切割
 
 服务一共分为以下几类：

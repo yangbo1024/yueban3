@@ -2,6 +2,5 @@ aiodns
 aiohttp
 aioredis
 cchardet
-gunicorn
 motor
 uvloop

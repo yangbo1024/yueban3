@@ -263,7 +263,6 @@ _handlers = {
     communicate.MasterPath.ReloadConfig: _reload_config_handler,
 }
 
-
 async def _yueban_handler(request):
     handler = _handlers.get(request.path)
     if not handler:
