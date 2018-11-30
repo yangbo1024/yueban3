@@ -70,8 +70,9 @@ class Lock(object):
         return 0
     end
     """
-
-    def __init__(self, lock_name, timeout=5.0, retry_interval=0.01, lua_valid=False):
+    # 可以根据需求启用lua
+    lua_valid = False
+    def __init__(self, lock_name, timeout=5.0, retry_interval=0.01, lua_valid=None):
         """
         开启lua可以在解锁时只请求1次；否则请求2次；
         因为主流云服务的redis对lua支持不好，所以默认关闭，避免调用失败
@@ -81,7 +82,8 @@ class Lock(object):
         self.lock_id = utility.gen_uniq_id()
         self.timeout = max(0.02, timeout)
         self.interval = max(0.001, retry_interval)
-        self.lua_valid = lua_valid
+        if lua_valid is not None:
+            self.lua_valid = lua_valid
 
     async def __aenter__(self):
         import asyncio
