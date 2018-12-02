@@ -9,7 +9,6 @@ excel->json
 
 import json
 from . import configuration
-import os
 import os.path
 import copy
 from . import log
@@ -49,38 +48,23 @@ def _load_table_data(path):
 
 
 def _get_newest_table_data(table_name):
+    table_data = _cached_tables.get(table_name)
+    if table_data:
+        return table_data
     path = _get_table_path(table_name)
-    stat_info = os.stat(path)
-    old_time = _cached_mtimes.get(table_name, 0)
-    try:
-        if stat_info.st_mtime > old_time:
-            _cached_mtimes[table_name] = stat_info.st_mtime
-            # update table data
-            table_data = _load_table_data(path)
-            _cached_tables[table_name] = table_data
-            return table_data
-        else:
-            table_data = _cached_tables.get(table_name)
-            if not table_data:
-                # first time load
-                table_data = _load_table_data(path)
-                _cached_tables[table_name] = table_data
-            return table_data
-    except Exception as e:
-        import traceback
-        s = traceback.format_exc()
-        log.error("get_newest_table_error", table_name, e, s)
-        raise e
+    table_data = _load_table_data(path)
+    _cached_tables[table_name] = table_data
+    return table_data
 
 
-def update_table(table_name, table_data_str, encoding='utf-8'):
+def update_table(table_name):
     """
     更新表，主要给系统接口用
+    :param table_name:
+    :return:
     """
-    path = _get_table_path(table_name)
-    with open(path, 'w', encoding=encoding) as f:
-        f.write(table_data_str)
-    _get_newest_table_data(table_name)
+    if table_name in _cached_tables:
+        _cached_tables.pop(table_name)
 
 
 def get_table(table_name, clone=True):
