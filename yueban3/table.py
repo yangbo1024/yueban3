@@ -14,7 +14,6 @@ import copy
 from . import log
 
 
-_cached_mtimes = {}
 _cached_tables = {}
 
 
