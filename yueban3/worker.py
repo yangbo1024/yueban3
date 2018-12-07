@@ -195,7 +195,7 @@ def get_worker_app():
     return _worker_app
 
 
-async def _on_shutdown():
+async def _on_shutdown(app):
     if _grace_timeout > 0:
         await asyncio.sleep(_grace_timeout)
     await communicate.cleanup()
