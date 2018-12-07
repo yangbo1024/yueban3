@@ -6,7 +6,6 @@ Master-不支持重启
 """
 
 from aiohttp import web
-import json
 import asyncio
 from . import utility
 from . import communicate
@@ -14,7 +13,6 @@ from . import configuration
 import traceback
 import time
 from . import log
-import pickle
 
 
 SEND_QUEUE_SIZE = 128
@@ -250,8 +248,10 @@ async def _reload_config_handler(request):
     try:
         configuration.reload_config()
         ret = "success"
-    except:
+        log_info("reload_config success")
+    except Exception as e:
         ret = "fail"
+        log_error("reload_config failed", e)
     return utility.pack_json_response(ret)
 
 
@@ -262,6 +262,7 @@ _handlers = {
     communicate.MasterPath.Schedule: _schedule_handler,
     communicate.MasterPath.ReloadConfig: _reload_config_handler,
 }
+
 
 async def _yueban_handler(request):
     handler = _handlers.get(request.path)
@@ -286,7 +287,13 @@ async def _initialize(cfg_path):
     _web_app.router.add_post('/{path:.*}', _yueban_handler)
 
 
-def run(cfg_path, master_id):
+def run(cfg_path, master_id, **kwargs):
+    """
+    :param cfg_path: 配置文件路径
+    :param master_id: 配置文件中的master服务的id
+    :param kwargs: 其它需要传递给aiohttp.web.run_app的参数
+    :return:
+    """
     global _web_app
     global _master_id
     _master_id = master_id
@@ -296,4 +303,4 @@ def run(cfg_path, master_id):
     cfg = master_config[master_id]
     host = cfg['host']
     port = cfg['port']
-    web.run_app(_web_app, host=host, port=port, access_log=None)
+    web.run_app(_web_app, host=host, port=port, **kwargs)

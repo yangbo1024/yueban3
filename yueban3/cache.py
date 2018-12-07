@@ -7,6 +7,8 @@ redis访问
 import aioredis
 from . import configuration
 from . import log
+import time
+
 
 _redis_pool = None
 
@@ -70,20 +72,28 @@ class Lock(object):
         return 0
     end
     """
-    # 可以根据需求启用lua
+    # 可以根据需求启用lua,开启lua可以在解锁时只请求1次；
+    # 否则请求2次，需要确定redis是否支持lua功能
     lua_valid = True
-    def __init__(self, lock_name, timeout=5.0, retry_interval=0.01, lua_valid=None):
+
+    # 慢锁日志，用于定位慢速的用锁代码
+    slow_log_time = None
+
+    def __init__(self, lock_name, timeout=5.0, retry_interval=0.01):
         """
-        开启lua可以在解锁时只请求1次；否则请求2次；
-        因为主流云服务的redis对lua支持不好，所以注意选择是否禁用lua，避免调用失败
+        :param lock_name: 锁名称
+        :param timeout: 申请锁的超时时间
+        :param retry_interval: 申请锁失败后重试间隔
+        :param lua_valid: 是否可以使用lua，开启lua可以在解锁时只请求1次；
+                          否则请求2次，需要确定redis是否支持lua功能
+                          默认None使用全局的lua_valid，否则使用特定的lua_valid
         """
         from . import utility
         self.lock_key = make_key(SYS_KEY_PREFIX, lock_name)
         self.lock_id = utility.gen_uniq_id()
         self.timeout = max(0.02, timeout)
         self.interval = max(0.001, retry_interval)
-        if lua_valid is not None:
-            self.lua_valid = lua_valid
+        self.begin_time = time.time()
 
     async def __aenter__(self):
         import asyncio
@@ -98,7 +108,7 @@ class Lock(object):
                 p_sum_time += p_interval
                 continue
             return self
-        msg = "lock failed:{} {} {}".format(self.lock_key, self.lock_id, self.timeout)
+        msg = "lock failed:{} {} {}, {}".format(self.lock_key, self.lock_id, self.timeout)
         log.error(msg)
         raise RuntimeError(msg)
 
@@ -114,3 +124,9 @@ class Lock(object):
             locked_id = await _redis_pool.get(self.lock_key)
             if locked_id == self.lock_id:
                 await _redis_pool.delete(self.lock_key)
+        if self.slow_log_time is not None:
+            used_time = time.time() - self.begin_time
+            if used_time >= self.slow_log_time:
+                import inspect
+                stack = inspect.stack()
+                log.error("slow_lock", self.lock_id, stack)
