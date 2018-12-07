@@ -37,7 +37,7 @@ async def cleanup():
     global _client
     if not _client:
         return None
-    await _client.close()
+    _client.close()
 
 
 def get_client():
