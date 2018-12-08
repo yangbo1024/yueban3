@@ -295,6 +295,7 @@ async def _initialize(cfg_path):
     # web
     _web_app = web.Application()
     _web_app.router.add_get("/ws", _websocket_handler)
+    _web_app.router.add_get('/{path:.*}', _yueban_handler)
     _web_app.router.add_post('/{path:.*}', _yueban_handler)
 
 
