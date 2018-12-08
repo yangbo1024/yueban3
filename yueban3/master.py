@@ -258,10 +258,12 @@ async def _reload_config_handler(request):
 async def _stat_handler(request):
     online_cnt = len(_clients)
     data = {
+        "id": _master_id,
         "online": online_cnt,
         "schedule": _schedule_cnt,
-        "id": _incr_client_id,
+        "incr": _incr_client_id,
     }
+    log.info("on_stat")
     return utility.pack_json_response(data)
 
 
