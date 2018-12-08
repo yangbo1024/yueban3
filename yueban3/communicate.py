@@ -21,6 +21,7 @@ class MasterPath(object):
     Schedule = "/__schedule"
     Hotfix = "/__hotfix"
     ReloadConfig = "/__reload_config"
+    Stat = "/__stat"
     
     
 class WorkerPath(object):

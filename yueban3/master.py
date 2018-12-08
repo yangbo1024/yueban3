@@ -255,12 +255,23 @@ async def _reload_config_handler(request):
     return utility.pack_json_response(ret)
 
 
+async def _stat_handler(request):
+    online_cnt = len(_clients)
+    data = {
+        "online": online_cnt,
+        "schedule": _schedule_cnt,
+        "id": _incr_client_id,
+    }
+    return utility.pack_json_response(data)
+
+
 _handlers = {
     communicate.MasterPath.Proto: _proto_handler,
     communicate.MasterPath.CloseClient: _close_client_handler,
     communicate.MasterPath.Hotfix: _hotfix_handler,
     communicate.MasterPath.Schedule: _schedule_handler,
     communicate.MasterPath.ReloadConfig: _reload_config_handler,
+    communicate.MasterPath.Stat: _stat_handler,
 }
 
 
