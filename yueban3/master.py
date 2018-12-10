@@ -301,7 +301,7 @@ async def _initialize(cfg_path):
     _web_app.router.add_post('/{path:.*}', _yueban_handler)
 
 
-def run(cfg_path, master_id, use_uvloop=True, **kwargs):
+def run(cfg_path, master_id, use_uvloop, **kwargs):
     """
     :param cfg_path: 配置文件路径
     :param master_id: 配置文件中的master服务的id
