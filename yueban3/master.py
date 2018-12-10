@@ -301,7 +301,7 @@ async def _initialize(cfg_path):
     _web_app.router.add_post('/{path:.*}', _yueban_handler)
 
 
-def run(cfg_path, master_id, **kwargs):
+def run(cfg_path, master_id, use_uvloop=True, **kwargs):
     """
     :param cfg_path: 配置文件路径
     :param master_id: 配置文件中的master服务的id
@@ -311,6 +311,9 @@ def run(cfg_path, master_id, **kwargs):
     global _web_app
     global _master_id
     _master_id = master_id
+    if use_uvloop:
+        import uvloop
+        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
     loop = asyncio.get_event_loop()
     loop.run_until_complete(_initialize(cfg_path))
     master_config = configuration.get_master_config()
