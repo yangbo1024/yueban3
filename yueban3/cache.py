@@ -66,7 +66,7 @@ class Lock(object):
                 print(lock.lock_id)
     """
     UNLOCK_SCRIPT = """
-    if redis.call("get", KEYS[1]) == ARGV[2] then
+    if redis.call("get", KEYS[1]) == ARGV[1] then
         return redis.call("del", KEYS[1])
     else
         return 0
@@ -79,11 +79,14 @@ class Lock(object):
     # 慢锁日志，用于定位慢速的用锁代码
     slow_log_time = None
 
-    def __init__(self, lock_name, timeout=5.0, retry_interval=0.01):
+    # 重试间隔
+    retry_interval = 0.01
+
+    def __init__(self, lock_name, timeout=5.0, retry_interval=None):
         """
         :param lock_name: 锁名称
         :param timeout: 申请锁的超时时间
-        :param retry_interval: 申请锁失败后重试间隔
+        :param retry_interval: 申请锁失败后重试间隔，如果为None则用默认值
         :param lua_valid: 是否可以使用lua，开启lua可以在解锁时只请求1次；
                           否则请求2次，需要确定redis是否支持lua功能
                           默认None使用全局的lua_valid，否则使用特定的lua_valid
@@ -91,24 +94,25 @@ class Lock(object):
         from . import utility
         self.lock_key = make_key(SYS_KEY_PREFIX, lock_name)
         self.lock_id = utility.gen_uniq_id()
-        self.timeout = max(0.02, timeout)
-        self.interval = max(0.001, retry_interval)
+        self.timeout = timeout
         self.begin_time = time.time()
+        if retry_interval is not None:
+            self.retry_interval = retry_interval
 
     async def __aenter__(self):
         import asyncio
         nx = _redis_pool.SET_IF_NOT_EXIST
         p_timeout = int(self.timeout * 1000)
-        p_interval = int(self.interval * 1000)
+        p_interval = int(self.retry_interval * 1000)
         p_sum_time = 0
         while p_sum_time < p_timeout:
-            ok = await _redis_pool.set(self.lock_key, self.lock_id, pexpire=p_interval, exist=nx)
+            ok = await _redis_pool.set(self.lock_key, self.lock_id, pexpire=p_timeout, exist=nx)
             if not ok:
-                await asyncio.sleep(self.interval)
+                await asyncio.sleep(self.retry_interval)
                 p_sum_time += p_interval
                 continue
             return self
-        msg = "lock failed:{} {} {}, {}".format(self.lock_key, self.lock_id, self.timeout)
+        msg = "lock failed:{} {} {}".format(self.lock_key, self.lock_id, self.timeout)
         log.error(msg)
         raise RuntimeError(msg)
 
