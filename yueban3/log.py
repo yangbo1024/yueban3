@@ -90,7 +90,7 @@ async def initialize():
     utility.ensure_directory(log_dir)
 
 
-def clear():
+async def cleanup():
     for category, log_file in _log_files.items():
         try:
             log_file.close()

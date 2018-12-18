@@ -201,6 +201,7 @@ async def _on_shutdown(app):
     await communicate.cleanup()
     await cache.cleanup()
     await storage.cleanup()
+    await log.cleanup()
 
 
 async def _initialize(cfg_path, worker_app, grace_timeout):
