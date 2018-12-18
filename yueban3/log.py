@@ -92,10 +92,11 @@ def error(*args):
 
 
 async def _loop_flush():
-    flush_interval = configuration.get_log_flush()
-    await asyncio.sleep(flush_interval)
-    for _, log_file in _log_files.items():
-        log_file.flush()
+    while 1:
+        flush_interval = configuration.get_log_flush()
+        await asyncio.sleep(flush_interval)
+        for _, log_file in _log_files.items():
+            log_file.flush()
 
 
 async def initialize():
