@@ -67,7 +67,7 @@ def log(category, log_type, *args):
         return
     f = get_log_file(category)
     now = datetime.now()
-    time_str = now.strftime('%Y-%m-%d %H:%M:%S,%f')[:23]
+    time_str = now.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]
     sl = [time_str, log_type]
     sl.extend([str(arg) for arg in args])
     sl.append(os.linesep)
