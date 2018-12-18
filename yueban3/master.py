@@ -290,6 +290,11 @@ async def _yueban_handler(request):
         log_error("error", e, s)
 
 
+async def _on_shutdown(app):
+    await communicate.cleanup()
+    await log.cleanup()
+
+
 async def _initialize(cfg_path):
     global _web_app
     configuration.init(cfg_path)
@@ -299,6 +304,7 @@ async def _initialize(cfg_path):
     _web_app.router.add_get("/ws", _websocket_handler)
     _web_app.router.add_get('/{path:.*}', _yueban_handler)
     _web_app.router.add_post('/{path:.*}', _yueban_handler)
+    _web_app.on_shutdown.append(_on_shutdown)
 
 
 def run(cfg_path, master_id, **kwargs):
