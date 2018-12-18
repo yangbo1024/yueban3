@@ -228,19 +228,15 @@ async def _initialize(cfg_path, worker_app, grace_timeout):
     return _web_app
 
 
-def run(cfg_path, worker_app, grace_timeout, use_uvloop, **kwargs):
+def run(cfg_path, worker_app, grace_timeout, **kwargs):
     """
     :param cfg_path: 配置文件路径
     :param worker_app: Worker的子类
     :param grace_timeout: 优雅重启需要等待的时间
-    :param use_uvloop: 是否使用uvloop
     :param kwargs: 其它需要传递给aiohttp.web.run_app的参数
     :return:
     """
     global _web_app
-    if use_uvloop:
-        import uvloop
-        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
     loop = asyncio.get_event_loop()
     loop.run_until_complete(_initialize(cfg_path, worker_app, grace_timeout))
     worker_cfg = configuration.get_worker_config()
