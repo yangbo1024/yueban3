@@ -11,6 +11,7 @@ from . import utility
 from . import configuration
 from datetime import datetime
 import os
+import asyncio
 
 
 LOG_FILE_POSTFIX = ".log"
@@ -23,6 +24,7 @@ class LogFile(object):
 
 
 _log_files = {}
+_flush_task = None
 
 
 def _create_file_obj(path, mdt):
@@ -73,7 +75,6 @@ def log(category, log_type, *args):
     sl.append(os.linesep)
     s = ' '.join(sl)
     f.write(s)
-    f.flush()
 
 
 def info(*args):
@@ -86,18 +87,29 @@ def error(*args):
     log(category, 'ERROR', *args)
 
 
+async def _loop_flush():
+    flush_interval = configuration.get_log_flush()
+    await asyncio.sleep(flush_interval)
+    for _, log_file in _log_files.items():
+        log_file.flush()
+
+
 async def initialize():
     log_dir = configuration.get_log_dir()
     utility.ensure_directory(log_dir)
+    asyncio.ensure_future(_loop_flush())
 
 
 async def cleanup():
     for category, log_file in _log_files.items():
         try:
+            log_file.flush()
             log_file.close()
         except Exception as e:
             import traceback
             tb = traceback.format_exc()
             utility.print_out('clear log error', category, e, tb)
+    if _flush_task:
+        _flush_task.cancel()
     _log_files.clear()
 

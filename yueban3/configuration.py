@@ -45,6 +45,7 @@ _config = {
         "ext": ".json"
     },
     "log": {
+        "flush": 0.5,
         "dir": "logs",
         "name": "log"
     }
@@ -101,6 +102,10 @@ def get_table_config():
 
 def get_log_config():
     return _config['log']
+
+
+def get_log_flush():
+    return _config['log']['flush']
 
 
 def get_log_dir():
