@@ -61,7 +61,7 @@ def get_log_file(category):
         file_obj.f.close()
         file_obj = _create_file_obj(src, now)
         _log_files[category] = file_obj
-    return file_obj.f
+    return file_obj
 
 
 def log(category, log_type, *args):
@@ -71,14 +71,14 @@ def log(category, log_type, *args):
     """
     if not args:
         return
-    f = get_log_file(category)
+    log_file = get_log_file(category)
     now = datetime.now()
     time_str = now.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]
     sl = [time_str, log_type]
     sl.extend([str(arg) for arg in args])
     sl.append(os.linesep)
     s = ' '.join(sl)
-    f.write(s)
+    log_file.f.write(s)
 
 
 def info(*args):
@@ -96,7 +96,7 @@ async def _loop_flush():
         flush_interval = configuration.get_log_flush()
         await asyncio.sleep(flush_interval)
         for _, log_file in _log_files.items():
-            log_file.flush()
+            log_file.f.flush()
 
 
 async def initialize():
@@ -109,8 +109,8 @@ async def initialize():
 async def cleanup():
     for category, log_file in _log_files.items():
         try:
-            log_file.flush()
-            log_file.close()
+            log_file.f.flush()
+            log_file.f.close()
         except Exception as e:
             import traceback
             tb = traceback.format_exc()
