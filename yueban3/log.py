@@ -26,7 +26,7 @@ _log_files = {}
 
 
 def _create_file_obj(path, mdt):
-    f = open(path, 'a', buffering=1)
+    f = open(path, 'a')
     file_obj = LogFile(mdt, f)
     return file_obj
 
@@ -73,6 +73,7 @@ def log(category, log_type, *args):
     sl.append(os.linesep)
     s = ' '.join(sl)
     f.write(s)
+    f.flush()
 
 
 def info(*args):
