@@ -95,9 +95,10 @@ async def _loop_flush():
 
 
 async def initialize():
+    global _flush_task
     log_dir = configuration.get_log_dir()
     utility.ensure_directory(log_dir)
-    asyncio.ensure_future(_loop_flush())
+    _flush_task = asyncio.ensure_future(_loop_flush())
 
 
 async def cleanup():
