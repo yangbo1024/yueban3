@@ -65,6 +65,10 @@ def get_log_file(category):
 
 
 def log(category, log_type, *args):
+    """
+    @param category: 会作为文件名
+    @param log_type: 一个字符串，如INFO
+    """
     if not args:
         return
     f = get_log_file(category)
