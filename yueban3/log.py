@@ -64,6 +64,7 @@ def get_log_file(category):
     return file_obj
 
 
+# 自定义log文件
 def log(category, log_type, *args):
     """
     @param category: 会作为文件名
@@ -79,23 +80,39 @@ def log(category, log_type, *args):
     sl.append(os.linesep)
     s = ' '.join(sl)
     log_file.f.write(s)
-    log_file.f.flush()
 
 
+# 写入信息到默认log文件
 def info(*args):
     category = configuration.get_log_name()
     log(category, 'INFO', *args)
 
 
+# 写入错误到默认log文件
 def error(*args):
     category = configuration.get_log_name()
     log(category, 'ERROR', *args)
+
+
+async def _loop_flush():
+    while 1:
+        flush_interval = configuration.get_log_flush()
+        await asyncio.sleep(flush_interval)
+        ks = _log_files.keys()
+        for log_name in ks:
+            log_file = _log_files.get(log_name)
+            if not log_file:
+                continue
+            log_file.f.flush()
+            # 不要霸占CPU
+            await asyncio.sleep(0)
 
 
 async def initialize():
     global _flush_task
     log_dir = configuration.get_log_dir()
     utility.ensure_directory(log_dir)
+    _flush_task = asyncio.ensure_future(_loop_flush())
 
 
 async def cleanup():
