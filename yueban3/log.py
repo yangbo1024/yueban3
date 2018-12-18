@@ -79,6 +79,7 @@ def log(category, log_type, *args):
     sl.append(os.linesep)
     s = ' '.join(sl)
     log_file.f.write(s)
+    log_file.f.flush()
 
 
 def info(*args):
@@ -91,19 +92,10 @@ def error(*args):
     log(category, 'ERROR', *args)
 
 
-async def _loop_flush():
-    while 1:
-        flush_interval = configuration.get_log_flush()
-        await asyncio.sleep(flush_interval)
-        for _, log_file in _log_files.items():
-            log_file.f.flush()
-
-
 async def initialize():
     global _flush_task
     log_dir = configuration.get_log_dir()
     utility.ensure_directory(log_dir)
-    _flush_task = asyncio.ensure_future(_loop_flush())
 
 
 async def cleanup():
