@@ -111,7 +111,7 @@ def get_row(table_name, index_name, index_value, clone=True):
                 break
     if not row:
         return None
-    return copy.deepcopy(row_data) if clone else row_data
+    return copy.deepcopy(row) if clone else row
 
 
 def get_cell(table_name, index_name, index_value, query_column, clone=True):
