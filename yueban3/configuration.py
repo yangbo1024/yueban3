@@ -30,7 +30,7 @@ _config = {
             "port": 10100,
             "url": "http://127.0.0.1:10001",
             "heartbeat": 10,
-            "max_idle": 60
+            "max_idle": 600
         }
     },
     "worker": {
