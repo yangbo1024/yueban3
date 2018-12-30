@@ -118,7 +118,7 @@ def get_cell(table_name, index_name, index_value, query_column, clone=True):
     """
     获取一个格子的内容
     """
-    row_map = get_row(table_name, index_name, index_value)
+    row_map = get_row(table_name, index_name, index_value, clone=False)
     if not row_map:
         return None
     cell = row_map.get(query_column)
