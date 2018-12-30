@@ -1,130 +1,122 @@
 # -*- coding:utf-8 -*-
 
-"""
-日志函数
-需要用到日志的地方，需要先初始化cache
-每个日志文件以category命名，按日切割
-注意category要全局唯一
-"""
-
-from . import utility
-from . import configuration
 from datetime import datetime
 import os
+import os.path
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from . import configuration
 
 
-LOG_FILE_POSTFIX = ".log"
+_executor = None
+_file = None
+_mdt = None
+_cache = []
+_task = None
+_stop = False
 
 
-class LogFile(object):
-    def __init__(self, mdt, f):
-        self.mdt = mdt
-        self.f = f
+def _ensure_log_dir():
+    cfg = configuration.get_log_config()
+    path = cfg['path']
+    if not os.path.exists(os.path.dirname(path)):
+        os.makedirs(os.path.dirname(path))
 
 
-_log_files = {}
-_flush_task = None
-
-
-def _create_file_obj(path, mdt):
-    f = open(path, 'a')
-    file_obj = LogFile(mdt, f)
-    return file_obj
-
-
-def get_log_file(category):
-    log_dir = configuration.get_log_dir()
-    path = os.path.join(log_dir, category)
-    path += LOG_FILE_POSTFIX
+def _ensure_log_file():
+    global _file
+    global _mdt
     now = datetime.now()
-    if category not in _log_files:
-        try:
-            stat_info = os.stat(path)
-            mdt = datetime.fromtimestamp(stat_info.st_mtime)
-        except FileNotFoundError:
-            mdt = now
-        _log_files[category] = _create_file_obj(path, mdt)
-    file_obj = _log_files[category]
-    mdt = file_obj.mdt
-    # 跨天
-    if mdt.day != now.day:
-        src = path
-        postfix = mdt.strftime('%Y%m%d')
-        dst = '{0}.{1}'.format(path, postfix)
-        if not os.path.exists(dst):
-            try:
-                # atomic
-                os.rename(src, dst)
-            except Exception as e:
-                utility.print_out('rename log error', src, dst, e, category)
-        file_obj.f.close()
-        file_obj = _create_file_obj(src, now)
-        _log_files[category] = file_obj
-    return file_obj
+    if _file is None:
+        # 创建日志文件
+        cfg = configuration.get_log_config()
+        path = cfg['path']
+        _file = open(path, 'a')
+        _mdt = now
+        return
+    if _mdt.day == now.day:
+        return
+    cfg = configuration.get_log_config()
+    path = cfg['path']
+    # 切割日志
+    postfix = _mdt.strftime('%Y%m%d')
+    dst = '{0}.{1}'.format(path, postfix)
+    # 原子操作
+    os.rename(path, dst)
+    _file.close()
+    _file = open(path, 'a')
+    _mdt = now
 
 
-# 自定义log文件
-def log(category, log_type, *args):
-    """
-    @param category: 会作为文件名
-    @param log_type: 一个字符串，如INFO
-    """
+async def _arrange_flush():
+    global _cache
+    global _executor
+
+    if len(_cache) <= 0:
+        return
+
+    log_list = _cache
+    _cache = []
+
+    def __flush():
+        global _file
+        global _mdt
+        now = datetime.now()
+        _ensure_log_file()
+        _mdt = now
+        for s in log_list:
+            _file.write(s)
+        _file.flush()
+
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(_executor, __flush)
+
+
+async def _loop_flush():
+    global _stop
+    while not _stop:
+        cfg = configuration.get_log_config()
+        interval = cfg['interval']
+        await asyncio.sleep(interval)
+        await _arrange_flush()
+
+
+async def initialize():
+    global _executor
+    global _task
+
+    _executor = ThreadPoolExecutor(1)
+    _ensure_log_dir()
+    _ensure_log_file()
+    _task = asyncio.ensure_future(_loop_flush())
+
+
+async def cleanup():
+    global _stop
+    await _arrange_flush()
+    _stop = True
+    await _task
+    
+
+# 自定义log类型
+def log(log_type, *args):
+    global _cache
     if not args:
         return
-    log_file = get_log_file(category)
     now = datetime.now()
     time_str = now.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]
     sl = [time_str, log_type]
     sl.extend([str(arg) for arg in args])
     sl.append(os.linesep)
     s = ' '.join(sl)
-    log_file.f.write(s)
+    _cache.append(s)
 
 
 # 写入信息到默认log文件
 def info(*args):
-    category = configuration.get_log_name()
-    log(category, 'INFO', *args)
+    log('INFO', *args)
 
 
 # 写入错误到默认log文件
 def error(*args):
-    category = configuration.get_log_name()
-    log(category, 'ERROR', *args)
-
-
-async def _loop_flush():
-    while 1:
-        flush_interval = configuration.get_log_flush()
-        await asyncio.sleep(flush_interval)
-        ks = _log_files.keys()
-        for log_name in ks:
-            log_file = _log_files.get(log_name)
-            if not log_file:
-                continue
-            log_file.f.flush()
-            # 不要霸占CPU
-            await asyncio.sleep(0)
-
-
-async def initialize():
-    global _flush_task
-    log_dir = configuration.get_log_dir()
-    utility.ensure_directory(log_dir)
-    _flush_task = asyncio.ensure_future(_loop_flush())
-
-
-async def cleanup():
-    for category, log_file in _log_files.items():
-        try:
-            log_file.f.flush()
-            log_file.f.close()
-        except Exception as e:
-            import traceback
-            tb = traceback.format_exc()
-            utility.print_out('clear log error', category, e, tb)
-    if _flush_task:
-        _flush_task.cancel()
-    _log_files.clear()
-
+    log('ERROR', *args)
