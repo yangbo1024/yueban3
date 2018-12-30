@@ -15,6 +15,7 @@ from . import log
 
 
 _cached_tables = {}
+_indexd_tables = {}
 
 
 def _get_table_path(table_name):
@@ -46,7 +47,7 @@ def _load_table_data(path):
     return table_data
 
 
-def _get_newest_table_data(table_name):
+def _get_table_data(table_name):
     table_data = _cached_tables.get(table_name)
     if table_data:
         return table_data
@@ -54,6 +55,24 @@ def _get_newest_table_data(table_name):
     table_data = _load_table_data(path)
     _cached_tables[table_name] = table_data
     return table_data
+
+
+def _create_index(table_name, index_name, index_value, row):
+    table_data = _indexd_tables.setdefault(table_name, {})
+    index_data = table_data.setdefault(index_name, {})
+    if index_value in index_data:
+        return
+    index_data[index_value] = row
+
+
+def _get_indexed_row(table_name, index_name, index_value):
+    table_data = _indexd_tables.get(table_name)
+    if not table_data:
+        return None
+    index_data = table_data.get(index_name)
+    if not index_data:
+        return None
+    return index_data.get(index_value)
 
 
 def update_table(table_name):
@@ -64,38 +83,35 @@ def update_table(table_name):
     """
     if table_name in _cached_tables:
         _cached_tables.pop(table_name)
+    if table_name in _indexd_tables:
+        _indexd_tables.pop(table_name)
 
 
 def get_table(table_name, clone=True):
     """
     获取整个表数据
     """
-    data = _get_newest_table_data(table_name)
+    data = _get_table_data(table_name)
     return copy.deepcopy(data) if clone else data
-
-
-def get_rows(table_name, index_name, index_value, clone=True):
-    """
-    获取能够匹配的所有行
-    """
-    table_data = _get_newest_table_data(table_name)
-    if not table_data:
-        return None
-    ret = [row_data for row_data in table_data if row_data[index_name] == index_value]
-    return copy.deepcopy(ret) if clone else ret
 
 
 def get_row(table_name, index_name, index_value, clone=True):
     """
     获取1行
     """
-    table_data = _get_newest_table_data(table_name)
-    if not table_data:
+    row = _get_indexed_row(table_name, index_name, index_value)
+    if not row:
+        table_data = _get_table_data(table_name)
+        if not table_data:
+            return None
+        for row_data in table_data:
+            if row_data[index_name] == index_value:
+                row = row_data
+                _create_index(table_name, index_name, index_value, row_data)
+                break
+    if not row:
         return None
-    for row_data in table_data:
-        if row_data[index_name] == index_value:
-            return copy.deepcopy(row_data) if clone else row_data
-    return None
+    return copy.deepcopy(row_data) if clone else row_data
 
 
 def get_cell(table_name, index_name, index_value, query_column, clone=True):
