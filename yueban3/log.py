@@ -95,10 +95,10 @@ async def initialize():
 
 async def cleanup():
     global _stop
-    await _arrange_flush()
     _stop = True
     await _task
-    
+    await _arrange_flush()
+
 
 # 自定义log类型
 def log(log_type, *args):
