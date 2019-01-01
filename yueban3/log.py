@@ -53,6 +53,8 @@ async def _arrange_flush():
     global _executor
 
     if len(_cache) <= 0:
+        # 如果没有写入，也判断一下是否需要切割
+        _ensure_log_file()
         return
 
     log_list = _cache
