@@ -47,6 +47,8 @@ _config = {
     "log": {
         "interval": 0.2,
         "path": "logs/log.log"
+    },
+    "custom": {
     }
 }
 
@@ -101,3 +103,7 @@ def get_table_config():
 
 def get_log_config():
     return _config['log']
+
+
+def get_custom_config():
+    return _config['custom']
