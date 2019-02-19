@@ -143,6 +143,7 @@ async def _recv_routine(client_obj, ws):
                 await communicate.call_worker(communicate.WorkerPath.ClientClosed, args)
                 break
         except Exception as e:
+            # 主要是超时
             remove_client(client_id)
             log_error('recv_routine', client_id, e, traceback.format_exc())
             args = {
