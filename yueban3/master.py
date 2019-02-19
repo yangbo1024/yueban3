@@ -44,16 +44,6 @@ class Client(object):
         self.create_time = int(time.time())
 
 
-def log_info(*args):
-    global _master_id
-    log.info(_master_id, *args)
-
-
-def log_error(*args):
-    global _master_id
-    log.error(_master_id, *args)
-
-
 def _add_client(client_id, host):
     client_obj = Client(client_id, host)
     _clients[client_id] = client_obj
@@ -68,7 +58,7 @@ def remove_client(client_id):
         client_obj.send_queue.put_nowait(None)
     except Exception as e:
         s = traceback.format_exc()
-        log_error("remove_client", e, s)
+        log.error("remove_client", e, s)
     _clients.pop(client_id)
     return True
 
@@ -82,7 +72,7 @@ def _put_s2c(client_id, data):
         q.put_nowait(data)            
     except Exception as e:
         s = traceback.format_exc()
-        log_error("put_s2c", client_id, data, e, s)
+        log.error("put_s2c", client_id, data, e, s)
 
 
 async def _send_routine(client_obj, ws):
@@ -94,7 +84,7 @@ async def _send_routine(client_obj, ws):
             msg = await queue.get()
             if msg is None:
                 # only in remove_client can be None
-                log_info('sendq_none', client_id)
+                log.info('sendq_none', client_id)
                 break
             if isinstance(msg, str):
                 await ws.send_str(msg)
@@ -104,7 +94,7 @@ async def _send_routine(client_obj, ws):
                 raise TypeError("unknown msg type")
         except Exception as e:
             remove_client(client_id)
-            log_error('send_routine', client_id, msg, e, traceback.format_exc())
+            log.error('send_routine', client_id, msg, e, traceback.format_exc())
             break
 
 
@@ -134,7 +124,7 @@ async def _recv_routine(client_obj, ws):
                 # 兼容框架
                 continue
             else:
-                log_info('recv_close', client_id, msg.type)
+                log.info('recv_close', client_id, msg.type)
                 remove_client(client_id)
                 args = {
                     "id": client_id,
@@ -145,7 +135,7 @@ async def _recv_routine(client_obj, ws):
         except Exception as e:
             # 主要是超时
             remove_client(client_id)
-            log_error('recv_routine', client_id, e, traceback.format_exc())
+            log.error('recv_routine', client_id, e, traceback.format_exc())
             args = {
                 "id": client_id,
                 "host": client_obj.host,
@@ -171,13 +161,13 @@ async def _websocket_handler(request):
     recv_task = asyncio.ensure_future(_recv_routine(client_obj, ws))
     client_obj.send_task = send_task
     client_obj.recv_task = recv_task
-    log_info('begin', client_id, client_host, len(_clients), _schedule_cnt)
+    log.info('begin', client_id, client_host, len(_clients), _schedule_cnt)
     await asyncio.wait([send_task, recv_task], return_when=asyncio.FIRST_COMPLETED)
-    log_info("end", client_id, len(_clients), _schedule_cnt)
+    log.info("end", client_id, len(_clients), _schedule_cnt)
     try:
         await ws.close()
     except asyncio.CancelledError:
-        log_error("ws cancelled", client_id)
+        log.error("ws cancelled", client_id)
     else:
         pass
     return ws
@@ -200,6 +190,7 @@ async def _close_client_handler(request):
     msg = await utility.unpack_pickle_request(request)
     client_id = msg["id"]
     ok = remove_client(client_id)
+    log.info('close_client', client_id, ok)
     return utility.pack_pickle_response(ok)
 
 
@@ -215,7 +206,7 @@ async def _hotfix_handler(request):
         import traceback
         result = [e, traceback.format_exc()]
     result = str(result)
-    log_info('hotfix', host, result)
+    log.info('hotfix', host, result)
     return utility.pack_json_response(result)
 
 
@@ -232,7 +223,7 @@ async def _future(seconds, name, args):
         await communicate.call_worker(path, msg)
     except Exception as e:
         import traceback
-        await log_error('schedule_error', name, args, e, traceback.format_exc())
+        log.error('schedule_error', name, args, e, traceback.format_exc())
     finally:
         _schedule_cnt -= 1
 
@@ -250,10 +241,10 @@ async def _reload_config_handler(request):
     try:
         configuration.reload_config()
         ret = "success"
-        log_info("reload_config success")
+        log.info("reload_config success")
     except Exception as e:
         ret = "fail"
-        log_error("reload_config failed", e)
+        log.error("reload_config failed", e)
     return utility.pack_json_response(ret)
 
 
@@ -282,14 +273,14 @@ _handlers = {
 async def _yueban_handler(request):
     handler = _handlers.get(request.path)
     if not handler:
-        log_error('bad handler', request.path)
+        log.error('bad handler', request.path)
         return utility.pack_json_response(None)
     try:
         ret = await handler(request)
         return ret
     except Exception as e:
         s = traceback.format_exc()
-        log_error("error", e, s)
+        log.error("error", e, s)
 
 
 async def _on_shutdown(app):
