@@ -134,6 +134,7 @@ async def _recv_routine(client_obj, ws):
                 # 兼容框架
                 continue
             else:
+                log_info('recv_close', client_id, msg.type)
                 remove_client(client_id)
                 args = {
                     "id": client_id,
