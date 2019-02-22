@@ -87,9 +87,6 @@ class Lock(object):
         :param lock_name: 锁名称
         :param timeout: 申请锁的超时时间
         :param retry_interval: 申请锁失败后重试间隔，如果为None则用默认值
-        :param lua_valid: 是否可以使用lua，开启lua可以在解锁时只请求1次；
-                          否则请求2次，需要确定redis是否支持lua功能
-                          默认None使用全局的lua_valid，否则使用特定的lua_valid
         """
         from . import utility
         self.lock_key = make_key(SYS_KEY_PREFIX, lock_name)
@@ -134,3 +131,5 @@ class Lock(object):
                 import inspect
                 stack = inspect.stack()
                 log.error("slow_lock", self.lock_id, stack)
+        return True
+
