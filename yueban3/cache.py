@@ -51,7 +51,7 @@ def get_connection_pool():
 
 class Lock(object):
     """
-    效率低，少用
+    效率低，少用；不适合并发量大的情况
     注意避免递归锁
     为防止忘记关闭锁的情况，暂时不提供
         begin_lock
