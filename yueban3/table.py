@@ -10,7 +10,6 @@ excel->json
 import json
 from . import configuration
 import os.path
-import copy
 from . import log
 
 
@@ -87,15 +86,15 @@ def update_table(table_name):
         _indexd_tables.pop(table_name)
 
 
-def get_table(table_name, clone=True):
+def get_table(table_name):
     """
     获取整个表数据
     """
     data = _get_table_data(table_name)
-    return copy.deepcopy(data) if clone else data
+    return data
 
 
-def get_row(table_name, index_name, index_value, clone=True):
+def get_row(table_name, index_name, index_value):
     """
     获取1行
     """
@@ -111,18 +110,18 @@ def get_row(table_name, index_name, index_value, clone=True):
                 break
     if not row:
         return None
-    return copy.deepcopy(row) if clone else row
+    return row
 
 
-def get_cell(table_name, index_name, index_value, query_column, clone=True):
+def get_cell(table_name, index_name, index_value, query_column):
     """
     获取一个格子的内容
     """
-    row_map = get_row(table_name, index_name, index_value, clone=False)
+    row_map = get_row(table_name, index_name, index_value)
     if not row_map:
         return None
     cell = row_map.get(query_column)
-    return copy.deepcopy(cell) if clone else cell
+    return cell
 
 
 async def initialize():
