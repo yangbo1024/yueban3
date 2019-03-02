@@ -63,7 +63,7 @@ async def cleanup():
     await _client_session.close()
 
 
-async def master_post(url, bs, timeout=10):
+async def master_post(url, bs, timeout=60):
     """
     master POST请求，不用连接池，避免一直发送数据导致worker不能因为keep-alive连接graceful shutdown
     发送：字节流
@@ -80,7 +80,7 @@ async def master_post(url, bs, timeout=10):
         log.error("http_post", url, bs, e)
 
 
-async def worker_post(url, bs, timeout=10):
+async def worker_post(url, bs, timeout=60):
     """
     HTTP POST请求，使用连接池
     发送：字节流
