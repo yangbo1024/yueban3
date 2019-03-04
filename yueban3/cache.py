@@ -8,6 +8,7 @@ import aioredis
 from . import configuration
 from . import log
 import time
+import asyncio
 
 
 _redis_pool = None
@@ -51,7 +52,7 @@ def get_connection_pool():
 
 class Lock(object):
     """
-    效率低，少用；不适合并发量大的情况
+    效率低，尽量少用；不适合单个锁并发量大的情况
     注意避免递归锁
     为防止忘记关闭锁的情况，暂时不提供
         begin_lock
@@ -95,6 +96,7 @@ class Lock(object):
         self.begin_time = time.time()
         if retry_interval is not None:
             self.retry_interval = retry_interval
+        self.tasks = []
 
     async def __aenter__(self):
         import asyncio
@@ -131,5 +133,13 @@ class Lock(object):
                 import inspect
                 stack = inspect.stack()
                 log.error("slow_lock", self.lock_id, stack)
+        if self.tasks:
+            try:
+                await asyncio.wait(self.tasks)
+            except Exception as e:
+                log.error('exit_lock', e, self.tasks)
         return True
 
+    def add_task(self, t):
+        # 一些不依赖顺序，不需要返回值的任务，在锁释放之前并发执行
+        self.tasks.append(t)
