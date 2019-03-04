@@ -4,11 +4,9 @@ from datetime import datetime
 import os
 import os.path
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from . import configuration
 
 
-_executor = None
 _file = None
 _mdt = None
 _cache = []
@@ -50,7 +48,6 @@ def _ensure_log_file():
 
 async def _arrange_flush():
     global _cache
-    global _executor
 
     if len(_cache) <= 0:
         # 如果没有写入，也判断一下是否需要切割
@@ -71,7 +68,7 @@ async def _arrange_flush():
         _file.flush()
 
     loop = asyncio.get_event_loop()
-    await loop.run_in_executor(_executor, __flush)
+    await loop.run_in_executor(None, __flush)
 
 
 async def _loop_flush():
@@ -84,10 +81,8 @@ async def _loop_flush():
 
 
 async def initialize():
-    global _executor
     global _task
 
-    _executor = ThreadPoolExecutor(1)
     _ensure_log_dir()
     _ensure_log_file()
     _task = asyncio.ensure_future(_loop_flush())
