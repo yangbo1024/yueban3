@@ -22,8 +22,8 @@ def make_key(*fields):
     return ':'.join(fields)
 
 
-async def create_pool(host, port, password, db, minsize, maxsize):
-    return await aioredis.create_redis_pool((host, port), db=db, password=password, minsize=minsize, maxsize=maxsize)
+async def create_pool(host, port, password, db, minsize, maxsize, **kwargs):
+    return await aioredis.create_redis_pool((host, port), db=db, password=password, minsize=minsize, maxsize=maxsize, **kwargs)
 
 
 async def initialize():
