@@ -142,4 +142,5 @@ class Lock(object):
 
     def add_task(self, t):
         # 一些不依赖顺序，不需要返回值的任务，在锁释放之前并发执行
+        # eg.保存数据
         self.tasks.append(t)
