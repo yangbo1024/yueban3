@@ -91,14 +91,19 @@ async def initialize():
 async def cleanup():
     global _stop
     _stop = True
-    await _task
+    if not _task.done():
+        try:
+            await _task
+        except Exception as _:
+            pass
     await _arrange_flush()
 
 
 # 自定义log类型
 def log(log_type, *args):
     global _cache
-    if not args:
+    global _stop
+    if _stop or not args:
         return
     now = datetime.now()
     time_str = now.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]
