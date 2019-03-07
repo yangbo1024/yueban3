@@ -5,7 +5,6 @@ Master-不支持重启
 可以保持客户端websocket长连接，以及定时回调
 """
 
-from aiohttp import web
 import asyncio
 from . import utility
 from . import communicate
@@ -14,6 +13,7 @@ import traceback
 import time
 from . import log
 from sanic import app
+from websockets.exceptions import ConnectionClosed
 
 
 SEND_QUEUE_SIZE = 128
@@ -113,10 +113,10 @@ async def _recv_routine(client_obj, ws):
             data = await communicate.call_worker(communicate.WorkerPath.Proto, args)
             if data is not None:
                 _put_s2c(client_id, data)
-        except Exception as e:
-            # 主要是超时
+        except (ConnectionClosed, Exception) as e:
+            # 主要是超时或断开
             remove_client(client_id)
-            log.error('recv_routine', client_id, e, traceback.format_exc())
+            log.info('_recv_routine', client_id, e)
             args = {
                 "id": client_id,
                 "ip": client_obj.ip,
@@ -140,7 +140,7 @@ async def _websocket_handler(request, ws):
         await asyncio.wait([send_task, recv_task], return_when=asyncio.FIRST_COMPLETED)
         log.info("end", client_id, len(_clients), _schedule_cnt)
     except Exception as e:
-        log.error('websocket_handler', request.ip, e)
+        log.error('_websocket_handler', request.ip, e)
 
 
 # worker-logic to master-gate
