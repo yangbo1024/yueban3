@@ -1,7 +1,6 @@
 sanic
-aiodns
 aiohttp
 aioredis
-cchardet
 motor
 uvloop
+lz4
