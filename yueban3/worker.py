@@ -23,6 +23,7 @@ import socket
 
 _web_app = sanic.Sanic()
 _worker_app = None
+_cfg_path = ''
 _worker_id = ""
 
 
@@ -200,12 +201,12 @@ def get_worker_app():
     return _worker_app
 
 
-async def _initialize(cfg_path, worker_app):
+@_web_app.listener('before_server_start')
+async def _initialize(worker_app):
     global _worker_app
     if not isinstance(worker_app, Worker):
         raise TypeError("bad worker instance type")
     _worker_app = worker_app
-    configuration.init(cfg_path)
     await log.initialize()
     tasks = [
         communicate.initialize(),
@@ -227,8 +228,7 @@ def run(cfg_path, worker_app, reuse_port=False, settings={}, **kwargs):
     :return:
     """
     global _web_app
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(_initialize(cfg_path, worker_app))
+    configuration.init(cfg_path)
     worker_cfg = configuration.get_worker_config()
     cfg = worker_cfg[worker_app.worker_id]
     host = cfg["host"]
