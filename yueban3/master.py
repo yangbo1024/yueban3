@@ -257,29 +257,28 @@ async def _yueban_handler(request, name):
 
 
 @_web_app.listener('after_server_stop')
-async def _on_shutdown(app):
+async def _on_shutdown(app, loop):
     await communicate.cleanup()
     await log.cleanup()
 
 
-async def _initialize(cfg_path):
-    global _web_app
-    configuration.init(cfg_path)
+@_web_app.listener('before_server_start')
+async def _initialize(app, loop):
     await log.initialize()
 
 
-def run(cfg_path, master_id, settings, **kwargs):
+def run(cfg_path, master_id, settings={}, **kwargs):
     """
     :param cfg_path: 配置文件路径
     :param master_id: 配置文件中的master服务的id
+    :param settings: sanic配置
     :param kwargs: 其它需要传递给aiohttp.web.run_app的参数
     :return:
     """
     global _web_app
     global _master_id
     _master_id = master_id
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(_initialize(cfg_path))
+    configuration.init(cfg_path)
     master_config = configuration.get_master_config()
     cfg = master_config[master_id]
     host = cfg['host']

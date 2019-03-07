@@ -221,8 +221,8 @@ def run(cfg_path, worker_app, reuse_port=False, settings={}, **kwargs):
     :param cfg_path: 配置文件路径
     :param worker_app: Worker的子类
     :param settings: 配置参数
-    :param reuse_port:
-    :param settings:
+    :param reuse_port: 是否允许reuse_port
+    :param settings: sanic配置
     :param kwargs: 其它需要传递给aiohttp.web.run_app的参数
     :return:
     """
@@ -235,11 +235,12 @@ def run(cfg_path, worker_app, reuse_port=False, settings={}, **kwargs):
     host = cfg["host"]
     port = cfg["port"]
     _web_app.config.update(settings)
-    sock = socket.socket()
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     if reuse_port:
+        sock = socket.socket()
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-    sock.bind((host, port))
-    sock.set_inheritable(True)
-    _web_app.run(sock=sock, **kwargs)
-
+        sock.bind((host, port))
+        sock.set_inheritable(True)
+        _web_app.run(sock=sock, **kwargs)
+    else:
+        _web_app.run(host=host, port=port, **kwargs)
