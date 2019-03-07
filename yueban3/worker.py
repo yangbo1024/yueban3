@@ -18,6 +18,7 @@ from . import storage
 from . import table
 import sanic
 from sanic import response
+import socket
 
 
 _web_app = sanic.Sanic()
@@ -214,11 +215,13 @@ async def _initialize(cfg_path, worker_app):
     await asyncio.gather(*tasks)
 
 
-def run(cfg_path, worker_app, settings, **kwargs):
+def run(cfg_path, worker_app, reuse_port=False, settings={}, **kwargs):
     """
     :param cfg_path: 配置文件路径
     :param worker_app: Worker的子类
     :param settings: 配置参数
+    :param reuse_port:
+    :param settings:
     :param kwargs: 其它需要传递给aiohttp.web.run_app的参数
     :return:
     """
@@ -230,5 +233,11 @@ def run(cfg_path, worker_app, settings, **kwargs):
     host = cfg["host"]
     port = cfg["port"]
     _web_app.config.update(settings)
-    _web_app.run(host=host, port=port, **kwargs)
+    sock = socket()
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    if reuse_port:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+    sock.bind((host, port))
+    sock.set_inheritable(True)
+    _web_app.run(sock=sock, **kwargs)
 
