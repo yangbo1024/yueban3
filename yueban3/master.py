@@ -116,7 +116,8 @@ async def _recv_routine(client_obj, ws):
         except (ConnectionClosed, Exception) as e:
             # 主要是超时或断开
             remove_client(client_id)
-            log.info('_recv_routine', client_id, e)
+            if not isinstance(e, ConnectionClosed):
+                log.info('_recv_routine', client_id, e)
             args = {
                 "id": client_id,
                 "ip": client_obj.ip,
@@ -127,20 +128,19 @@ async def _recv_routine(client_obj, ws):
 
 @_web_app.websocket('/ws')
 async def _websocket_handler(request, ws):
+    ip = request.ip
+    client_id = gen_client_id()
     try:
-        ip = request.ip
-        client_id = gen_client_id()
         client_obj = _add_client(client_id, ip)
         client_obj.send_queue = asyncio.Queue(SEND_QUEUE_SIZE)
         send_task = asyncio.ensure_future(_send_routine(client_obj, ws))
         recv_task = asyncio.ensure_future(_recv_routine(client_obj, ws))
         client_obj.send_task = send_task
         client_obj.recv_task = recv_task
-        log.info('begin', client_id, ip, len(_clients), _schedule_cnt)
+        log.info('begin', ip, client_id, len(_clients), _schedule_cnt)
         await asyncio.wait([send_task, recv_task], return_when=asyncio.FIRST_COMPLETED)
-        log.info("end", client_id, len(_clients), _schedule_cnt)
-    except Exception as e:
-        log.error('_websocket_handler', request.ip, e)
+    finally:
+        log.info('end', ip, client_id)
 
 
 # worker-logic to master-gate
