@@ -104,7 +104,7 @@ async def _recv_routine(client_obj, ws):
     client_id = client_obj.client_id
     while 1:
         try:
-            data = await asyncio.wait(ws.recv(), timeout=max_idle)
+            data = await asyncio.wait_for(ws.recv(), timeout=max_idle)
             args = {
                 "id": client_id,
                 "ip": client_obj.ip,
