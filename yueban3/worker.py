@@ -111,6 +111,7 @@ async def _yueban_handler(request, name):
 @_web_app.listener('after_server_stop')
 async def _on_shutdown(app, loop):
     log.info('shutdown')
+    asyncio.set_event_loop(loop)
     await communicate.cleanup()
     await cache.cleanup()
     await storage.cleanup()
