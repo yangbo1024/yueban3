@@ -32,15 +32,14 @@ class ProtocolMessage(object):
     长连接协议收到的数据包封装对象
     data可以是二进制也可能是文本
     """
-    def __init__(self, host, client_id, msg_type, data):
-        self.host = host
+    def __init__(self, ip, client_id, data):
+        self.ip = ip
         self.client_id = client_id
-        self.msg_type = msg_type
         self.data = data
 
     def __str__(self):
-        return 'ProtocolMessage(host={0},client_id={1},data={2}'.format(
-            self.host, self.client_id, self.data
+        return 'ProtocolMessage(ip={0},client_id={1},data={2}'.format(
+            self.ip, self.client_id, self.data
         )
 
 
@@ -78,10 +77,9 @@ async def _yueban_handler(request, name):
         if path == communicate.WorkerPath.Proto:
             msg = await utility.unpack_pickle_request(request)
             client_id = msg["id"]
-            msg_type = msg["type"]
             data = msg["data"]
-            host = msg["host"]
-            msg_obj = ProtocolMessage(host, client_id, msg_type, data)
+            ip = msg["ip"]
+            msg_obj = ProtocolMessage(ip, client_id, data)
             data = await _worker_app.on_proto(msg_obj)
             # data不为None表示有应答数据，一应一答的场景下可以省掉调用master的开销
             return utility.pack_pickle_response(data)

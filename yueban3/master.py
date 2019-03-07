@@ -36,17 +36,17 @@ class Client(object):
     """
     客户端对象，与客户端1：1存在
     """
-    def __init__(self, client_id, host):
+    def __init__(self, client_id, ip):
         self.client_id = client_id
-        self.host = host
+        self.ip = ip
         self.send_task = None
         self.recv_task = None
         self.send_queue = None
         self.create_time = int(time.time())
 
 
-def _add_client(client_id, host):
-    client_obj = Client(client_id, host)
+def _add_client(client_id, ip):
+    client_obj = Client(client_id, ip)
     _clients[client_id] = client_obj
     return client_obj
 
@@ -104,12 +104,11 @@ async def _recv_routine(client_obj, ws):
     client_id = client_obj.client_id
     while 1:
         try:
-            msg = await asyncio.wait_for(ws.recv(), max_idle)
+            data = await asyncio.wait(ws.recv(), timeout=max_idle)
             args = {
                 "id": client_id,
-                "host": client_obj.host,
-                "type": msg.type,
-                "data": msg.data,
+                "ip": client_obj.ip,
+                "data": data,
             }
             data = await communicate.call_worker(communicate.WorkerPath.Proto, args)
             if data is not None:
@@ -120,7 +119,7 @@ async def _recv_routine(client_obj, ws):
             log.error('recv_routine', client_id, e, traceback.format_exc())
             args = {
                 "id": client_id,
-                "host": client_obj.host,
+                "ip": client_obj.ip,
             }
             await communicate.call_worker(communicate.WorkerPath.ClientClosed, args)
             break
@@ -166,7 +165,7 @@ async def _close_client_handler(request):
 
 
 async def _hotfix_handler(request):
-    host = request.headers.get("X-Real-IP") or request.remote
+    ip = request.ip
     import importlib
     try:
         importlib.invalidate_caches()
@@ -177,7 +176,7 @@ async def _hotfix_handler(request):
         import traceback
         result = [e, traceback.format_exc()]
     result = str(result)
-    log.info('hotfix', host, result)
+    log.info('hotfix', ip, result)
     return utility.pack_json_response(result)
 
 
