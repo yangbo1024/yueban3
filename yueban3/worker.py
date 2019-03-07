@@ -202,11 +202,10 @@ def get_worker_app():
 
 
 @_web_app.listener('before_server_start')
-async def _initialize(worker_app):
+async def _initialize(app, loop):
     global _worker_app
-    if not isinstance(worker_app, Worker):
+    if not isinstance(_worker_app, Worker):
         raise TypeError("bad worker instance type")
-    _worker_app = worker_app
     await log.initialize()
     tasks = [
         communicate.initialize(),
