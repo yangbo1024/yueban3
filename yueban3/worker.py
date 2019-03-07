@@ -233,7 +233,7 @@ def run(cfg_path, worker_app, reuse_port=False, settings={}, **kwargs):
     host = cfg["host"]
     port = cfg["port"]
     _web_app.config.update(settings)
-    sock = socket()
+    sock = socket.socket()
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     if reuse_port:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
