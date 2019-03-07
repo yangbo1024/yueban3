@@ -12,8 +12,7 @@ import datetime
 import os
 import os.path
 import base64
-import aiohttp
-from aiohttp import web
+from sanic import response
 
 
 def simple_crypt(bs):
@@ -139,23 +138,23 @@ def gen_uniq_id(encoding='utf-8'):
 
 
 async def unpack_pickle_request(request):
-    bs = await request.read()
+    bs = request.body
     return pickle.loads(bs)
 
 
 def pack_pickle_response(data):
     bs = pickle.dumps(data, pickle.HIGHEST_PROTOCOL)
-    return web.Response(body=bs)
+    return response.raw(bs)
 
 
 async def unpack_json_request(request):
-    bs = await request.read()
+    bs = await request.body
     return json.loads(bs)
 
 
 def pack_json_response(data):
-    bs = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
-    return web.Response(body=bs)
+    s = json.dumps(data, separators=(",", ":"), ensure_ascii=False)
+    return response.text(s)
 
 
 def print_out(*args):

@@ -6,8 +6,6 @@ worker-逻辑进程
 """
 
 import asyncio
-import json
-from aiohttp import web
 from . import utility
 from . import communicate
 from abc import ABCMeta
@@ -18,12 +16,13 @@ from . import log
 from . import cache
 from . import storage
 from . import table
+import sanic
+from sanic import response
 
 
+_web_app = sanic.Sanic()
 _worker_app = None
-_web_app = None
 _worker_id = ""
-_grace_timeout = 5
 
 
 class ProtocolMessage(object):
@@ -48,13 +47,6 @@ class Worker(object, metaclass=ABCMeta):
         self.worker_id = worker_id
 
     @abstractmethod
-    async def on_request(self, request):
-        """
-        http请求
-        """
-        pass
-
-    @abstractmethod
     async def on_schedule(self, name, args):
         """
         定时回调，响应yueban3.worker.schedule_once的调用
@@ -77,7 +69,8 @@ class Worker(object, metaclass=ABCMeta):
         pass
 
 
-async def _yueban_handler(request):
+@_web_app.route('/__/<name>', methods=['GET', 'POST'])
+async def _yueban_handler(request, name):
     path = request.path
     try:
         if path == communicate.WorkerPath.Proto:
@@ -105,12 +98,22 @@ async def _yueban_handler(request):
             rets = await communicate.call_all_masters(communicate.MasterPath.ReloadConfig, {})
             return utility.pack_pickle_response(rets)
         else:
-            return await _worker_app.on_request(request)
+            log.error('bad_yueban_handler', path, request.ip)
+            return response.text('bad request')
     except Exception as e:
-        bs = await request.read()
+        bs = request.body
         ts = traceback.format_exc()
         log.error("yueban_hander", path, bs, e, ts)
         return utility.pack_pickle_response('')
+
+
+@_web_app.listener('after_server_stop')
+async def _on_shutdown(app, loop):
+    log.info('shutdown')
+    await communicate.cleanup()
+    await cache.cleanup()
+    await storage.cleanup()
+    await log.cleanup()
 
 
 async def unicast(client_id, data):
@@ -195,52 +198,37 @@ def get_worker_app():
     return _worker_app
 
 
-async def _on_shutdown(app):
-    if _grace_timeout > 0:
-        await asyncio.sleep(_grace_timeout)
-    await communicate.cleanup()
-    await cache.cleanup()
-    await storage.cleanup()
-    await log.cleanup()
-
-
-async def _initialize(cfg_path, worker_app, grace_timeout):
+async def _initialize(cfg_path, worker_app):
     global _worker_app
-    global _web_app
-    global _grace_timeout
     if not isinstance(worker_app, Worker):
         raise TypeError("bad worker instance type")
-    _grace_timeout = grace_timeout
     _worker_app = worker_app
     configuration.init(cfg_path)
     await log.initialize()
-    await communicate.initialize()
-    await table.initialize()
     tasks = [
+        communicate.initialize(),
+        table.initialize(),
         cache.initialize(),
         storage.initialize(),
     ]
     await asyncio.gather(*tasks)
-    _web_app = web.Application()
-    _web_app.router.add_get("/{path:.*}", _yueban_handler)
-    _web_app.router.add_post("/{path:.*}", _yueban_handler)
-    _web_app.on_shutdown.append(_on_shutdown)
-    return _web_app
 
 
-def run(cfg_path, worker_app, grace_timeout, **kwargs):
+def run(cfg_path, worker_app, settings, **kwargs):
     """
     :param cfg_path: 配置文件路径
     :param worker_app: Worker的子类
-    :param grace_timeout: 优雅重启需要等待的时间
+    :param settings: 配置参数
     :param kwargs: 其它需要传递给aiohttp.web.run_app的参数
     :return:
     """
     global _web_app
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(_initialize(cfg_path, worker_app, grace_timeout))
+    loop.run_until_complete(_initialize(cfg_path, worker_app))
     worker_cfg = configuration.get_worker_config()
     cfg = worker_cfg[worker_app.worker_id]
     host = cfg["host"]
     port = cfg["port"]
-    web.run_app(_web_app, host=host, port=port, **kwargs)
+    _web_app.config.update(settings)
+    _web_app.run(host=host, port=port, **kwargs)
+

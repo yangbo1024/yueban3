@@ -13,12 +13,13 @@ from . import configuration
 import traceback
 import time
 from . import log
+from sanic import app
 
 
 SEND_QUEUE_SIZE = 128
 
 
-_web_app = globals().setdefault('_web_app')
+_web_app = globals().setdefault('_web_app', app.Sanic())
 _master_id = globals().setdefault('_master_id', '')
 _clients = globals().setdefault('_clients', {})
 _schedule_cnt = globals().setdefault("_schedule_cnt", 0)
@@ -86,12 +87,7 @@ async def _send_routine(client_obj, ws):
                 # only in remove_client can be None
                 log.info('sendq_none', client_id)
                 break
-            if isinstance(msg, str):
-                await ws.send_str(msg)
-            elif isinstance(msg, bytes):
-                await ws.send_bytes(msg)
-            else:
-                raise TypeError("unknown msg type")
+            await ws.send(msg)
         except Exception as e:
             remove_client(client_id)
             log.error('send_routine', client_id, msg, e, traceback.format_exc())
@@ -108,30 +104,16 @@ async def _recv_routine(client_obj, ws):
     client_id = client_obj.client_id
     while 1:
         try:
-            msg = await ws.receive(timeout=max_idle)
-            # auto ping&pong, 所以只有消息包会收到
-            if msg.type in (web.WSMsgType.TEXT, web.WSMsgType.BINARY):
-                args = {
-                    "id": client_id,
-                    "host": client_obj.host,
-                    "type": msg.type,
-                    "data": msg.data,
-                }
-                data = await communicate.call_worker(communicate.WorkerPath.Proto, args)
-                if data is not None:
-                    _put_s2c(client_id, data)
-            elif msg.type in (web.WSMsgType.PING, web.WSMsgType.PONG):
-                # 兼容框架
-                continue
-            else:
-                log.info('recv_close', client_id, msg.type)
-                remove_client(client_id)
-                args = {
-                    "id": client_id,
-                    "host": client_obj.host,
-                }
-                await communicate.call_worker(communicate.WorkerPath.ClientClosed, args)
-                break
+            msg = await asyncio.wait_for(ws.recv(), max_idle)
+            args = {
+                "id": client_id,
+                "host": client_obj.host,
+                "type": msg.type,
+                "data": msg.data,
+            }
+            data = await communicate.call_worker(communicate.WorkerPath.Proto, args)
+            if data is not None:
+                _put_s2c(client_id, data)
         except Exception as e:
             # 主要是超时
             remove_client(client_id)
@@ -144,33 +126,22 @@ async def _recv_routine(client_obj, ws):
             break
 
 
-async def _websocket_handler(request):
-    master_config = configuration.get_master_config()
-    cfg = master_config[_master_id]
-    _heartbeat = cfg["heartbeat"]
-    if _heartbeat <= 0:
-        ws = web.WebSocketResponse()
-    else:
-        ws = web.WebSocketResponse(heartbeat=_heartbeat)
-    await ws.prepare(request)
-    client_host = request.headers.get("X-Real-IP") or request.remote
-    client_id = gen_client_id()
-    client_obj = _add_client(client_id, client_host)
-    client_obj.send_queue = asyncio.Queue(SEND_QUEUE_SIZE)
-    send_task = asyncio.ensure_future(_send_routine(client_obj, ws))
-    recv_task = asyncio.ensure_future(_recv_routine(client_obj, ws))
-    client_obj.send_task = send_task
-    client_obj.recv_task = recv_task
-    log.info('begin', client_id, client_host, len(_clients), _schedule_cnt)
-    await asyncio.wait([send_task, recv_task], return_when=asyncio.FIRST_COMPLETED)
-    log.info("end", client_id, len(_clients), _schedule_cnt)
+@_web_app.websocket('/ws')
+async def _websocket_handler(request, ws):
     try:
-        await ws.close()
-    except asyncio.CancelledError:
-        log.error("ws cancelled", client_id)
-    else:
-        pass
-    return ws
+        ip = request.ip
+        client_id = gen_client_id()
+        client_obj = _add_client(client_id, ip)
+        client_obj.send_queue = asyncio.Queue(SEND_QUEUE_SIZE)
+        send_task = asyncio.ensure_future(_send_routine(client_obj, ws))
+        recv_task = asyncio.ensure_future(_recv_routine(client_obj, ws))
+        client_obj.send_task = send_task
+        client_obj.recv_task = recv_task
+        log.info('begin', client_id, ip, len(_clients), _schedule_cnt)
+        await asyncio.wait([send_task, recv_task], return_when=asyncio.FIRST_COMPLETED)
+        log.info("end", client_id, len(_clients), _schedule_cnt)
+    except Exception as e:
+        log.error('websocket_handler', request.ip, e)
 
 
 # worker-logic to master-gate
@@ -270,19 +241,22 @@ _handlers = {
 }
 
 
-async def _yueban_handler(request):
-    handler = _handlers.get(request.path)
+@_web_app.route('/__/<name>', methods=['GET', 'POST'])
+async def _yueban_handler(request, name):
+    path = request.path
+    handler = _handlers.get(path)
     if not handler:
-        log.error('bad handler', request.path)
+        log.error('bad_handler', path)
         return utility.pack_json_response(None)
     try:
         ret = await handler(request)
         return ret
     except Exception as e:
         s = traceback.format_exc()
-        log.error("error", e, s)
+        log.error("yueban_handler", e, s)
 
 
+@_web_app.listener('after_server_stop')
 async def _on_shutdown(app):
     await communicate.cleanup()
     await log.cleanup()
@@ -292,15 +266,9 @@ async def _initialize(cfg_path):
     global _web_app
     configuration.init(cfg_path)
     await log.initialize()
-    # web
-    _web_app = web.Application()
-    _web_app.router.add_get("/ws", _websocket_handler)
-    _web_app.router.add_get('/{path:.*}', _yueban_handler)
-    _web_app.router.add_post('/{path:.*}', _yueban_handler)
-    _web_app.on_shutdown.append(_on_shutdown)
 
 
-def run(cfg_path, master_id, **kwargs):
+def run(cfg_path, master_id, settings, **kwargs):
     """
     :param cfg_path: 配置文件路径
     :param master_id: 配置文件中的master服务的id
@@ -316,4 +284,6 @@ def run(cfg_path, master_id, **kwargs):
     cfg = master_config[master_id]
     host = cfg['host']
     port = cfg['port']
-    web.run_app(_web_app, host=host, port=port, **kwargs)
+    _web_app.config.update(settings)
+    _web_app.run(host=host, port=port, **kwargs)
+

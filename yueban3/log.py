@@ -94,7 +94,7 @@ async def cleanup():
     if not _task.done():
         try:
             await _task
-        except Exception as _:
+        finally:
             pass
     await _arrange_flush()
 

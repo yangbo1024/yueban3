@@ -16,19 +16,19 @@ _client_session = None
 
 
 class MasterPath(object):
-    Proto = "/__proto"
-    CloseClient = "/__close_client"
-    Schedule = "/__schedule"
-    Hotfix = "/__hotfix"
-    ReloadConfig = "/__reload_config"
-    Stat = "/__stat"
+    Proto = "/__/proto"
+    CloseClient = "/__/close_client"
+    Schedule = "/__/schedule"
+    Hotfix = "/__/hotfix"
+    ReloadConfig = "/__/reload_config"
+    Stat = "/__/stat"
     
     
 class WorkerPath(object):
-    Proto = "/__proto"
-    ClientClosed = "/__client_closed"
-    OnSchedule = "/__on_schedule"
-    ProxyReloadConfig = "/__proxy_reload_config"
+    Proto = "/__/proto"
+    ClientClosed = "/__/client_closed"
+    OnSchedule = "/__/on_schedule"
+    ProxyReloadConfig = "/__/proxy_reload_config"
 
 
 def dumps(obj):
