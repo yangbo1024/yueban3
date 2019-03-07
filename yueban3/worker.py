@@ -227,6 +227,8 @@ def run(cfg_path, worker_app, reuse_port=False, settings={}, **kwargs):
     :return:
     """
     global _web_app
+    global _worker_app
+    _worker_app = worker_app
     configuration.init(cfg_path)
     worker_cfg = configuration.get_worker_config()
     cfg = worker_cfg[worker_app.worker_id]
