@@ -12,9 +12,6 @@ import random
 from . import log
 
 
-_client_session = None
-
-
 class MasterPath(object):
     Proto = "/__/proto"
     CloseClient = "/__/close_client"
@@ -39,33 +36,9 @@ def loads(bs):
     return pickle.loads(bs)
 
 
-async def initialize():
-    global _client_session
-    _client_session = aiohttp.ClientSession()
-    return _client_session
-
-
-def get_client_session():
+async def post(url, bs, timeout=60):
     """
-    请求尽量在一个全局session里发送
-    """
-    global _client_session
-    return _client_session
-
-
-async def cleanup():
-    """
-    清理
-    """
-    global _client_session
-    if not _client_session:
-        return 
-    await _client_session.close()
-
-
-async def master_post(url, bs, timeout=60):
-    """
-    master POST请求，不用连接池，避免一直发送数据导致worker不能因为keep-alive连接graceful shutdown
+    POST请求，不用连接池，避免一直发送数据导致因为keep-alive连接不能及时优雅退出
     发送：字节流
     接收: 字节流
     """
@@ -80,23 +53,6 @@ async def master_post(url, bs, timeout=60):
         log.error("http_post", url, bs, e)
 
 
-async def worker_post(url, bs, timeout=60):
-    """
-    HTTP POST请求，使用连接池
-    发送：字节流
-    接收: 字节流
-    """
-    session = _client_session
-    try:
-        async with session.post(url, data=bs, timeout=timeout) as resp:
-            if resp.status != 200:
-                raise RuntimeError('http_post:{},{},{}'.format(url, bs, resp.status))
-            bs = await resp.read()
-            return bs
-    except Exception as e:
-        log.error("http_post", url, bs, e)
-
-
 async def call_specific_master(master_id, path, args):
     """
     调用指定的Master
@@ -106,7 +62,7 @@ async def call_specific_master(master_id, path, args):
     base_url = cfg["url"]
     url = '{0}{1}'.format(base_url, path)
     bs = dumps(args)
-    bs = await worker_post(url, bs)
+    bs = await post(url, bs)
     return loads(bs)
 
 
@@ -144,7 +100,7 @@ async def call_worker(path, args):
     base_url = cfg["url"]
     url = '{0}{1}'.format(base_url, path)
     bs = dumps(args)
-    bs = await master_post(url, bs)
+    bs = await post(url, bs)
     return loads(bs)
 
 

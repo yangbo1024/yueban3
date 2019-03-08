@@ -85,12 +85,14 @@ async def _send_routine(client_obj, ws):
             msg = await queue.get()
             if msg is None:
                 # only in remove_client can be None
+                # 不直接cancel这个task的目的是为了保证整个数据都发出去再退出，避免发送一半断开的情况
                 log.info('sendq_none', client_id)
                 break
             await ws.send(msg)
-        except Exception as e:
+        except (ConnectionClosed, Exception) as e:
             remove_client(client_id)
-            log.error('send_routine', client_id, msg, e, traceback.format_exc())
+            if not isinstance(e, ConnectionClosed):
+                log.error('send_except', client_id, msg, e, traceback.format_exc())
             break
 
 
@@ -117,7 +119,7 @@ async def _recv_routine(client_obj, ws):
             # 主要是超时或断开
             remove_client(client_id)
             if not isinstance(e, ConnectionClosed):
-                log.info('_recv_routine', client_id, e)
+                log.info('recv_except', client_id, e)
             args = {
                 "id": client_id,
                 "ip": client_obj.ip,
@@ -257,7 +259,6 @@ async def _yueban_handler(request, name):
 
 @_web_app.listener('after_server_stop')
 async def _on_shutdown(app, loop):
-    await communicate.cleanup()
     await log.cleanup()
 
 
@@ -266,7 +267,7 @@ async def _initialize(app, loop):
     await log.initialize()
 
 
-def run(cfg_path, master_id, settings={}, **kwargs):
+def run(cfg_path, master_id, settings={'KEEP_ALIVE': False}, **kwargs):
     """
     :param cfg_path: 配置文件路径
     :param master_id: 配置文件中的master服务的id

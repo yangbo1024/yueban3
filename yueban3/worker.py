@@ -111,9 +111,9 @@ async def _yueban_handler(request, name):
 async def _on_shutdown(app, loop):
     log.info('shutdown')
     asyncio.set_event_loop(loop)
-    await communicate.cleanup()
     await cache.cleanup()
     await storage.cleanup()
+    # 停止log是最后一步
     await log.cleanup()
 
 
@@ -206,7 +206,6 @@ async def _initialize(app, loop):
         raise TypeError("bad worker instance type")
     await log.initialize()
     tasks = [
-        communicate.initialize(),
         table.initialize(),
         cache.initialize(),
         storage.initialize(),
@@ -214,7 +213,7 @@ async def _initialize(app, loop):
     await asyncio.gather(*tasks)
 
 
-def run(cfg_path, worker_app, reuse_port=False, settings={}, **kwargs):
+def run(cfg_path, worker_app, reuse_port=False, settings={'KEEP_ALIVE': False}, **kwargs):
     """
     :param cfg_path: 配置文件路径
     :param worker_app: Worker的子类
