@@ -142,14 +142,22 @@ async def unpack_pickle_request(request):
     return pickle.loads(bs)
 
 
+def parse_pickle_request(request):
+    return pickle.loads(request.body)
+
+
 def pack_pickle_response(data):
     bs = pickle.dumps(data, pickle.HIGHEST_PROTOCOL)
     return response.raw(bs)
 
 
 async def unpack_json_request(request):
-    bs = await request.body
+    bs = request.body
     return json.loads(bs)
+
+
+def parse_json_request(request):
+    return json.loads(request.body)
 
 
 def pack_json_response(data):
