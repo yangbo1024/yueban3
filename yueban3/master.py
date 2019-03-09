@@ -43,6 +43,7 @@ class Client(object):
         self.recv_task = None
         self.send_queue = None
         self.create_time = int(time.time())
+        self.bad = False
 
 
 def _add_client(client_id, ip):
@@ -84,7 +85,7 @@ async def _send_routine(client_obj, ws):
         try:
             msg = await queue.get()
             if msg is None:
-                # only in remove_client can be None
+                # 只有服务器主动断开才会是None，仅仅在remove_client中出现
                 # 不直接cancel这个task的目的是为了保证整个数据都发出去再退出，避免发送一半断开的情况
                 log.info('sendq_none', client_id)
                 break
@@ -93,6 +94,7 @@ async def _send_routine(client_obj, ws):
             remove_client(client_id)
             if not isinstance(e, ConnectionClosed):
                 log.error('send_except', client_id, msg, e, traceback.format_exc())
+            client_obj.bad = True
             break
 
 
@@ -120,6 +122,7 @@ async def _recv_routine(client_obj, ws):
             remove_client(client_id)
             if not isinstance(e, ConnectionClosed):
                 log.info('recv_except', client_id, e)
+            client_obj.bad = True
             break
 
 
@@ -137,11 +140,12 @@ async def _websocket_handler(request, ws):
         log.info('begin', ip, client_id, len(_clients), _schedule_cnt)
         await asyncio.wait([send_task, recv_task], return_when=asyncio.FIRST_COMPLETED)
     finally:
-        args = {
-            "id": client_id,
-            "ip": client_obj.ip,
-        }
-        await communicate.call_worker(communicate.WorkerPath.ClientClosed, args)
+        if client_obj.bad:
+            args = {
+                "id": client_id,
+                "ip": client_obj.ip,
+            }
+            await communicate.call_worker(communicate.WorkerPath.ClientClosed, args)
         log.info('end', ip, client_id)
 
 
