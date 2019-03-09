@@ -117,7 +117,7 @@ async def _async_consumer():
         if t is None:
             break
         try:
-            await t()
+            await t
         except Exception as e:
             log.error('_async_consumer', t, e)
 
@@ -268,7 +268,7 @@ def run(cfg_path, worker_app, reuse_port=False, settings={'KEEP_ALIVE': False}, 
     :param settings: 配置参数
     :param reuse_port: 是否允许reuse_port
     :param settings: sanic配置
-    :param kwargs: 其它需要传递给aiohttp.web.run_app的参数
+    :param kwargs: 其它需要传递给sanic.app.run的参数
     :return:
     """
     global _web_app
