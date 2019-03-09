@@ -146,7 +146,7 @@ async def _websocket_handler(request, ws):
                 "ip": client_obj.ip,
             }
             await communicate.call_worker(communicate.WorkerPath.ClientClosed, args)
-        log.info('end', ip, client_id)
+        log.info('end', ip, client_id, client_obj.bad)
 
 
 # worker-logic to master-gate
