@@ -19,13 +19,14 @@ from . import table
 import sanic
 from sanic import response
 import socket
+import os
 
 
 _web_app = sanic.Sanic()
 _worker_app = None
 _cfg_path = ''
 _worker_id = ""
-_async_tasks = asyncio.Queue()
+_async_tasks = None         # queue
 _consumer_task = None
 
 
@@ -124,10 +125,12 @@ async def _async_consumer():
 @_web_app.listener('before_server_start')
 async def _initialize(app, loop):
     global _worker_app
+    global _async_tasks
     global _consumer_task
     if not isinstance(_worker_app, Worker):
         raise TypeError("bad worker instance type")
     await log.initialize()
+    _async_tasks = asyncio.Queue()
     _consumer_task = asyncio.ensure_future(_async_consumer(), loop=loop)
     tasks = [
         table.initialize(),
@@ -140,7 +143,7 @@ async def _initialize(app, loop):
 @_web_app.listener('after_server_stop')
 async def _on_shutdown(app, loop):
     global _consumer_task
-    log.info('shutdown')
+    log.info('shutdown', os.getpid())
     # 发送停止异步任务信号
     _consumer_task.put_nowait(None)
     if not _consumer_task.done():
