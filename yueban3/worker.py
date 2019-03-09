@@ -277,7 +277,7 @@ def run(cfg_path, worker_app, reuse_port=False, settings={'KEEP_ALIVE': False}, 
     host = cfg["host"]
     port = cfg["port"]
     _web_app.config.update(settings)
-    if reuse_port:
+    if reuse_port and not kwargs.get('sock'):
         sock = socket.socket()
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
