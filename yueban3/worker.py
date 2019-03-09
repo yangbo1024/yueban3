@@ -132,7 +132,7 @@ async def _initialize(app, loop):
     await log.initialize()
     log.info('start', os.getpid())
     _async_tasks = asyncio.Queue()
-    _consumer_task = asyncio.ensure_future(_async_consumer(), loop=loop)
+    _consumer_task = loop.create_task(_async_consumer())
     tasks = [
         table.initialize(),
         cache.initialize(),
@@ -250,16 +250,16 @@ def get_worker_app():
     return _worker_app
 
 
-def ensure_future(task):
+def async_execute(coro):
     """
     添加一个异步任务
     :param task:
     :return:
     """
     global _async_tasks
-    if task is None:
+    if coro is None:
         return
-    _async_tasks.put_nowait(task)
+    _async_tasks.put_nowait(coro)
 
 
 def run(cfg_path, worker_app, reuse_port=False, settings={'KEEP_ALIVE': False}, **kwargs):
