@@ -120,11 +120,6 @@ async def _recv_routine(client_obj, ws):
             remove_client(client_id)
             if not isinstance(e, ConnectionClosed):
                 log.info('recv_except', client_id, e)
-            args = {
-                "id": client_id,
-                "ip": client_obj.ip,
-            }
-            await communicate.call_worker(communicate.WorkerPath.ClientClosed, args)
             break
 
 
@@ -132,8 +127,8 @@ async def _recv_routine(client_obj, ws):
 async def _websocket_handler(request, ws):
     ip = request.headers.get('X-Real-IP') or request.ip
     client_id = gen_client_id()
+    client_obj = _add_client(client_id, ip)
     try:
-        client_obj = _add_client(client_id, ip)
         client_obj.send_queue = asyncio.Queue(SEND_QUEUE_SIZE)
         send_task = asyncio.ensure_future(_send_routine(client_obj, ws))
         recv_task = asyncio.ensure_future(_recv_routine(client_obj, ws))
@@ -142,6 +137,11 @@ async def _websocket_handler(request, ws):
         log.info('begin', ip, client_id, len(_clients), _schedule_cnt)
         await asyncio.wait([send_task, recv_task], return_when=asyncio.FIRST_COMPLETED)
     finally:
+        args = {
+            "id": client_id,
+            "ip": client_obj.ip,
+        }
+        await communicate.call_worker(communicate.WorkerPath.ClientClosed, args)
         log.info('end', ip, client_id)
 
 

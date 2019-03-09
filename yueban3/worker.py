@@ -66,7 +66,7 @@ class Worker(object, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    async def on_client_closed(self, client_id):
+    async def on_client_closed(self, client_id, ip):
         """
         客户端主动或异常断开连接，master会做清理，不必再通知master
         """
@@ -90,7 +90,7 @@ async def _yueban_handler(request, name):
             msg = await utility.unpack_pickle_request(request)
             client_id = msg["id"]
             ip = msg['ip']
-            await _worker_app.on_client_closed(client_id)
+            await _worker_app.on_client_closed(client_id, ip)
             return utility.pack_pickle_response('')
         elif path == communicate.WorkerPath.OnSchedule:
             msg = await utility.unpack_pickle_request(request)
