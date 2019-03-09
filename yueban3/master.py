@@ -91,10 +91,10 @@ async def _send_routine(client_obj, ws):
                 break
             await ws.send(msg)
         except (ConnectionClosed, Exception) as e:
+            client_obj.bad = True
             remove_client(client_id)
             if not isinstance(e, ConnectionClosed):
                 log.error('send_except', client_id, msg, e, traceback.format_exc())
-            client_obj.bad = True
             break
 
 
@@ -119,10 +119,10 @@ async def _recv_routine(client_obj, ws):
                 _put_s2c(client_id, data)
         except (ConnectionClosed, Exception) as e:
             # 主要是超时或断开
+            client_obj.bad = True
             remove_client(client_id)
             if not isinstance(e, ConnectionClosed):
                 log.info('recv_except', client_id, e)
-            client_obj.bad = True
             break
 
 
