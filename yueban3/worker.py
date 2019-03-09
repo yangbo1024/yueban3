@@ -25,6 +25,8 @@ _web_app = sanic.Sanic()
 _worker_app = None
 _cfg_path = ''
 _worker_id = ""
+_async_tasks = asyncio.Queue()
+_consumer_task = None
 
 
 class ProtocolMessage(object):
@@ -107,10 +109,45 @@ async def _yueban_handler(request, name):
         return utility.pack_pickle_response('')
 
 
+# 异步任务
+async def _async_consumer():
+    while 1:
+        t = await _async_tasks.get()
+        if t is None:
+            break
+        try:
+            await t()
+        except Exception as e:
+            log.error('_async_consumer', t, e)
+
+
+@_web_app.listener('before_server_start')
+async def _initialize(app, loop):
+    global _worker_app
+    global _consumer_task
+    if not isinstance(_worker_app, Worker):
+        raise TypeError("bad worker instance type")
+    await log.initialize()
+    _consumer_task = loop.ensure_future(_async_consumer())
+    tasks = [
+        table.initialize(),
+        cache.initialize(),
+        storage.initialize(),
+    ]
+    await asyncio.gather(*tasks)
+
+
 @_web_app.listener('after_server_stop')
 async def _on_shutdown(app, loop):
+    global _consumer_task
     log.info('shutdown')
-    asyncio.set_event_loop(loop)
+    # 发送停止异步任务信号
+    _consumer_task.put_nowait(None)
+    if not _consumer_task.done():
+        try:
+            await _consumer_task
+        finally:
+            pass
     await cache.cleanup()
     await storage.cleanup()
     # 停止log是最后一步
@@ -192,25 +229,20 @@ async def schedule_once(seconds, name, args):
 
 
 def get_web_app():
+    global _web_app
     return _web_app
 
 
 def get_worker_app():
+    global _worker_app
     return _worker_app
 
 
-@_web_app.listener('before_server_start')
-async def _initialize(app, loop):
-    global _worker_app
-    if not isinstance(_worker_app, Worker):
-        raise TypeError("bad worker instance type")
-    await log.initialize()
-    tasks = [
-        table.initialize(),
-        cache.initialize(),
-        storage.initialize(),
-    ]
-    await asyncio.gather(*tasks)
+def ensure_future(task):
+    global _consumer_task
+    if task is None:
+        return
+    _consumer_task.put_nowait(task)
 
 
 def run(cfg_path, worker_app, reuse_port=False, settings={'KEEP_ALIVE': False}, **kwargs):

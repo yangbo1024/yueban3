@@ -13,10 +13,10 @@ import traceback
 import time
 from . import log
 from sanic import app
-from websockets.exceptions import ConnectionClosed
+from sanic.app import ConnectionClosed
 
 
-SEND_QUEUE_SIZE = 128
+SEND_QUEUE_SIZE = 32
 
 
 _web_app = globals().setdefault('_web_app', app.Sanic())
