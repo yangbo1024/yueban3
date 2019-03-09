@@ -130,6 +130,7 @@ async def _initialize(app, loop):
     if not isinstance(_worker_app, Worker):
         raise TypeError("bad worker instance type")
     await log.initialize()
+    log.info('start', os.getpid())
     _async_tasks = asyncio.Queue()
     _consumer_task = asyncio.ensure_future(_async_consumer(), loop=loop)
     tasks = [
@@ -143,7 +144,7 @@ async def _initialize(app, loop):
 @_web_app.listener('after_server_stop')
 async def _on_shutdown(app, loop):
     global _consumer_task
-    log.info('shutdown', os.getpid())
+    log.info('stop', os.getpid())
     # 发送停止异步任务信号
     _async_tasks.put_nowait(None)
     if not _consumer_task.done():
