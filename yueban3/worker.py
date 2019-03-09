@@ -253,7 +253,7 @@ def get_worker_app():
 def async_execute(coro):
     """
     添加一个异步任务
-    :param task:
+    :param coro: coroutine
     :return:
     """
     global _async_tasks
