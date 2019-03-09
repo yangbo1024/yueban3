@@ -130,7 +130,7 @@ async def _recv_routine(client_obj, ws):
 
 @_web_app.websocket('/ws')
 async def _websocket_handler(request, ws):
-    ip = request.ip
+    ip = request.headers.get('X-Real-IP') or request.ip
     client_id = gen_client_id()
     try:
         client_obj = _add_client(client_id, ip)
@@ -167,7 +167,7 @@ async def _close_client_handler(request):
 
 
 async def _hotfix_handler(request):
-    ip = request.ip
+    ip = request.headers.get('X-Real-IP') or request.ip
     import importlib
     try:
         importlib.invalidate_caches()

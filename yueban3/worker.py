@@ -89,6 +89,7 @@ async def _yueban_handler(request, name):
         elif path == communicate.WorkerPath.ClientClosed:
             msg = await utility.unpack_pickle_request(request)
             client_id = msg["id"]
+            ip = msg['ip']
             await _worker_app.on_client_closed(client_id)
             return utility.pack_pickle_response('')
         elif path == communicate.WorkerPath.OnSchedule:
