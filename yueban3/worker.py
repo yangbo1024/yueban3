@@ -128,7 +128,7 @@ async def _initialize(app, loop):
     if not isinstance(_worker_app, Worker):
         raise TypeError("bad worker instance type")
     await log.initialize()
-    _consumer_task = loop.ensure_future(_async_consumer())
+    _consumer_task = asyncio.ensure_future(_async_consumer())
     tasks = [
         table.initialize(),
         cache.initialize(),
