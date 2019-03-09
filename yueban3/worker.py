@@ -229,16 +229,29 @@ async def schedule_once(seconds, name, args):
 
 
 def get_web_app():
+    """
+    web框架对象，即sanic对象
+    :return:
+    """
     global _web_app
     return _web_app
 
 
 def get_worker_app():
+    """
+    worker app对象，唯一
+    :return:
+    """
     global _worker_app
     return _worker_app
 
 
 def ensure_future(task):
+    """
+    添加一个异步任务
+    :param task:
+    :return:
+    """
     global _consumer_task
     if task is None:
         return
