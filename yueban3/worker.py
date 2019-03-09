@@ -252,10 +252,10 @@ def ensure_future(task):
     :param task:
     :return:
     """
-    global _consumer_task
+    global _async_tasks
     if task is None:
         return
-    _consumer_task.put_nowait(task)
+    _async_tasks.put_nowait(task)
 
 
 def run(cfg_path, worker_app, reuse_port=False, settings={'KEEP_ALIVE': False}, **kwargs):
