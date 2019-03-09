@@ -145,7 +145,7 @@ async def _on_shutdown(app, loop):
     global _consumer_task
     log.info('shutdown', os.getpid())
     # 发送停止异步任务信号
-    _consumer_task.put_nowait(None)
+    _async_tasks.put_nowait(None)
     if not _consumer_task.done():
         try:
             await _consumer_task
