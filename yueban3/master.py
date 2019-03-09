@@ -43,7 +43,7 @@ class Client(object):
         self.recv_task = None
         self.send_queue = None
         self.create_time = int(time.time())
-        self.bad = False
+        self.shut = False       # 是否服务器主动关闭
 
 
 def _add_client(client_id, ip):
@@ -52,10 +52,11 @@ def _add_client(client_id, ip):
     return client_obj
 
 
-def remove_client(client_id):
+def remove_client(client_id, shut=False):
     client_obj = _clients.get(client_id)
     if not client_obj:
         return False
+    client_obj.shut = shut
     try:
         client_obj.send_queue.put_nowait(None)
     except Exception as e:
@@ -91,7 +92,6 @@ async def _send_routine(client_obj, ws):
                 break
             await ws.send(msg)
         except (ConnectionClosed, Exception) as e:
-            client_obj.bad = True
             remove_client(client_id)
             if not isinstance(e, ConnectionClosed):
                 log.error('send_except', client_id, msg, e, traceback.format_exc())
@@ -119,7 +119,6 @@ async def _recv_routine(client_obj, ws):
                 _put_s2c(client_id, data)
         except (ConnectionClosed, Exception) as e:
             # 主要是超时或断开
-            client_obj.bad = True
             remove_client(client_id)
             if not isinstance(e, ConnectionClosed):
                 log.info('recv_except', client_id, e)
@@ -140,13 +139,13 @@ async def _websocket_handler(request, ws):
         log.info('begin', ip, client_id, len(_clients), _schedule_cnt)
         await asyncio.wait([send_task, recv_task], return_when=asyncio.FIRST_COMPLETED)
     finally:
-        if client_obj.bad:
+        if not client_obj.shut:
             args = {
                 "id": client_id,
                 "ip": client_obj.ip,
             }
             await communicate.call_worker(communicate.WorkerPath.ClientClosed, args)
-        log.info('end', ip, client_id, client_obj.bad)
+        log.info('end', ip, client_id, client_obj.shut)
 
 
 # worker-logic to master-gate
@@ -165,7 +164,7 @@ async def _proto_handler(request):
 async def _close_client_handler(request):
     msg = await utility.unpack_pickle_request(request)
     client_id = msg["id"]
-    ok = remove_client(client_id)
+    ok = remove_client(client_id, shut=True)
     log.info('close_client', client_id, ok)
     return utility.pack_pickle_response(ok)
 
