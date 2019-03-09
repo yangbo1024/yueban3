@@ -264,6 +264,7 @@ async def _on_shutdown(app, loop):
 
 @_web_app.listener('before_server_start')
 async def _initialize(app, loop):
+    asyncio.set_event_loop(loop)
     await log.initialize()
 
 
