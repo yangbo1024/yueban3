@@ -19,7 +19,7 @@ SYS_KEY_PREFIX = '__'
 
 
 def make_key(*fields):
-    return ':'.join(fields)
+    return ':'.join([str(f) for f in fields])
 
 
 async def create_pool(host, port, password, db, minsize, maxsize, **kwargs):
