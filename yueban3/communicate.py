@@ -46,7 +46,7 @@ async def post(url, bs, timeout=60):
         async with aiohttp.ClientSession() as session:
             async with session.post(url, data=bs, timeout=timeout) as resp:
                 if resp.status != 200:
-                    raise RuntimeError('')
+                    raise RuntimeError('bad status:{}'.format(resp.status))
                 rbs = await resp.read()
                 return rbs
     except Exception as e:
