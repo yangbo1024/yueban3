@@ -48,11 +48,22 @@ def _add_client(client_id, ip):
     return client_obj
 
 
-def remove_client(client_id, shut=False):
+def _pop_client(client_id):
     client_obj = _clients.get(client_id)
     if client_obj:
         _clients.pop(client_id)
     return client_obj
+
+
+async def _c2s(ws, args, max_idle):
+    # 发协议
+    try:
+        data = await communicate.call_worker(communicate.WorkerPath.Proto, args)
+        if data is not None:
+            # data不为None，代表一应一答，类似RPC
+            await asyncio.wait_for(ws.send(data), timeout=max_idle)
+    finally:
+        pass
 
 
 async def _serve(client_obj):
@@ -70,11 +81,8 @@ async def _serve(client_obj):
                 'ip': ip,
                 'data': data,
             }
-                # 没有被关闭才发协议
-            data = await communicate.call_worker(communicate.WorkerPath.Proto, args)
-            if data is not None:
-                # data不为None，代表一应一答，类似RPC
-                await asyncio.wait_for(ws.send(data), timeout=max_idle)
+            task = asyncio.shield(_c2s(ws, args, max_idle))
+            await task
         except asyncio.CancelledError:
             log.info("client_cancel", client_id)
             break
@@ -97,8 +105,11 @@ async def _websocket_handler(request, ws):
     client_obj.task = task
     try:
         await asyncio.wait([task])
+    except Exception as e:
+        log.error('ws_handler', client_id, type(e))
+    finally:
         # 主要是超时或断开
-        remove_client(client_id)
+        _pop_client(client_id)
         if not client_obj.shut:
             args = {
                 "id": client_id,
@@ -106,8 +117,6 @@ async def _websocket_handler(request, ws):
             }
             await communicate.call_worker(communicate.WorkerPath.ClientClosed, args)
         log.info('end', client_id, len(_clients))
-    except Exception as e:
-        log.error('ws_handler', client_id, type(e))
 
 
 # worker-logic to master-gate
@@ -133,13 +142,15 @@ async def _proto_handler(request):
 async def _close_client_handler(request):
     msg = await utility.unpack_pickle_request(request)
     client_id = msg["id"]
-    client_obj = remove_client(client_id, True)
+    client_obj = _pop_client(client_id)
     log.info('close_client', client_id)
-    if client_obj and not client_obj.task.done():
-        try:
-            client_obj.task.cancel()
-        except Exception as e:
-            log.error('close_cancel', client_id, type(e))
+    if client_obj:
+        client_obj.shut = True
+        if client_obj.task and not client_obj.task.task.done():
+            try:
+                client_obj.task.cancel()
+            except Exception as e:
+                log.error('close_cancel', client_id, type(e))
     return utility.pack_pickle_response('')
 
 
