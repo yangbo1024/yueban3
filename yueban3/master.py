@@ -133,7 +133,10 @@ async def _proto_handler(request):
         t = client_obj.ws.send(data)
         ts.append(t)
     if ts:
-        await asyncio.wait(ts)
+        try:
+            await asyncio.wait(ts)
+        except Exception as e:
+            log.error('proto_handler', type(e), len(client_ids), data)
     return utility.pack_pickle_response("")
 
 
