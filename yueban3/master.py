@@ -105,8 +105,6 @@ async def _websocket_handler(request, ws):
     client_obj.task = task
     try:
         await asyncio.wait([task])
-    except Exception as e:
-        log.error('ws_handler', client_id, type(e))
     finally:
         # 主要是超时或断开
         _pop_client(client_id)
@@ -144,14 +142,16 @@ async def _close_client_handler(request):
     client_id = msg["id"]
     client_obj = _pop_client(client_id)
     log.info('close_client', client_id)
-    if client_obj:
-        client_obj.shut = True
-        if client_obj.task and not client_obj.task.task.done():
-            try:
-                client_obj.task.cancel()
-            except Exception as e:
-                log.error('close_cancel', client_id, type(e))
-    return utility.pack_pickle_response('')
+    ret = utility.pack_pickle_response('')
+    if not client_obj:
+        return ret
+    client_obj.shut = True
+    if client_obj.task and not client_obj.task.done():
+        try:
+            client_obj.task.cancel()
+        except Exception as e:
+            log.error('close_cancel', client_id, type(e))
+    return ret
 
 
 async def _hotfix_handler(request):
