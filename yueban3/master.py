@@ -33,17 +33,19 @@ class Client(object):
     """
     客户端对象，与客户端1：1存在
     """
-    def __init__(self, client_id, ip):
-        self.client_id = client_id
-        self.ip = ip
+    def __init__(self, client_id):
         self.ctime = int(time.time())
+        self.client_id = client_id
+        self.ip = ''
         self.shut = False       # 是否服务器主动关闭
         self.task = None
         self.ws = None
 
 
-def _add_client(client_id, ip):
-    client_obj = Client(client_id, ip)
+def _add_client(client_id, ip, ws):
+    client_obj = Client(client_id)
+    client_obj.ip = ip
+    client_obj.ws = ws
     _clients[client_id] = client_obj
     return client_obj
 
@@ -84,13 +86,12 @@ async def _serve(client_obj):
             task = asyncio.shield(_c2s(ws, args, max_idle))
             await task
         except asyncio.CancelledError:
-            log.info("client_cancel", client_id)
             break
-        except (ConnectionClosed, Exception) as e:
-            # TODO
-            if not isinstance(e, ConnectionClosed) or True:
-                s = traceback.format_exc()
-                log.info('recv_except', client_id, type(e), s)
+        except ConnectionClosed:
+            break
+        except Exception as e:
+            s = traceback.format_exc()
+            log.info('recv_except', client_id, type(e), s)
             break
 
 
@@ -98,8 +99,7 @@ async def _serve(client_obj):
 async def _websocket_handler(request, ws):
     ip = request.headers.get('X-Real-IP') or request.ip
     client_id = gen_client_id()
-    client_obj = _add_client(client_id, ip)
-    client_obj.ws = ws
+    client_obj = _add_client(client_id, ip, ws)
     log.info('begin', client_id, ip, len(_clients))
     task = asyncio.ensure_future(_serve(client_obj))
     client_obj.task = task
@@ -141,7 +141,7 @@ async def _close_client_handler(request):
     msg = await utility.unpack_pickle_request(request)
     client_id = msg["id"]
     client_obj = _pop_client(client_id)
-    log.info('close_client', client_id)
+    log.info('close_client', client_id, bool(client_obj))
     ret = utility.pack_pickle_response('')
     if not client_obj:
         return ret
