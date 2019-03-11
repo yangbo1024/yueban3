@@ -44,6 +44,13 @@ class Client(object):
         self.send_queue = None
         self.create_time = int(time.time())
         self.shut = False       # 是否服务器主动关闭
+        self.closed = False     # 是否已经被关闭
+
+    def put_s2c(self, msg):
+        try:
+            self.send_queue.put_nowait(msg)
+        except Exception as e:
+            log.error('put_s2c', e, self.client_id, msg)
 
 
 def _add_client(client_id, ip):
@@ -57,6 +64,7 @@ def remove_client(client_id, shut=False):
     if not client_obj:
         return False
     client_obj.shut = shut
+    client_obj.closed = True
     try:
         client_obj.send_queue.put_nowait(None)
     except Exception as e:
@@ -66,23 +74,14 @@ def remove_client(client_id, shut=False):
     return True
 
 
-def _put_s2c(client_id, data):
-    client_obj = _clients.get(client_id)
-    if not client_obj:
-        return
-    try:
-        q = client_obj.send_queue
-        q.put_nowait(data)            
-    except Exception as e:
-        s = traceback.format_exc()
-        log.error("put_s2c", client_id, data, e, s)
-
-
 async def _send_routine(client_obj, ws):
+    master_config = configuration.get_master_config()
+    cfg = master_config[_master_id]
+    max_idle = cfg["max_idle"]
     client_id = client_obj.client_id
     queue = client_obj.send_queue
     msg = None
-    while 1:
+    while not client_obj.closed:
         try:
             msg = await queue.get()
             if msg is None:
@@ -90,7 +89,8 @@ async def _send_routine(client_obj, ws):
                 # 不直接cancel这个task的目的是为了保证整个数据都发出去再退出，避免发送一半断开的情况
                 log.info('sendq_none', client_id)
                 break
-            await ws.send(msg)
+            # 如果被关闭，发送会抛错
+            await asyncio.wait_for(ws.send(msg), timeout=max_idle)
         except (ConnectionClosed, Exception) as e:
             remove_client(client_id)
             if not isinstance(e, ConnectionClosed):
@@ -106,7 +106,7 @@ async def _recv_routine(client_obj, ws):
     cfg = master_config[_master_id]
     max_idle = cfg["max_idle"]
     client_id = client_obj.client_id
-    while 1:
+    while not client_obj.closed:
         try:
             data = await asyncio.wait_for(ws.recv(), timeout=max_idle)
             args = {
@@ -114,9 +114,12 @@ async def _recv_routine(client_obj, ws):
                 "ip": client_obj.ip,
                 "data": data,
             }
-            data = await communicate.call_worker(communicate.WorkerPath.Proto, args)
-            if data is not None:
-                _put_s2c(client_id, data)
+            if not client_obj.closed:
+                # 已经被关闭，不再发协议
+                data = await communicate.call_worker(communicate.WorkerPath.Proto, args)
+                if data is not None:
+                    # data不为None，代表一应一答，类似RPC
+                    client_obj.put_s2c(data)
         except (ConnectionClosed, Exception) as e:
             # 主要是超时或断开
             remove_client(client_id)
@@ -157,7 +160,10 @@ async def _proto_handler(request):
         # broadcast
         client_ids = _clients.keys()
     for client_id in client_ids:
-        _put_s2c(client_id, data)
+        client_obj = _clients.get(client_id)
+        if not client_obj:
+            continue
+        client_obj.put_s2c(data)
     return utility.pack_pickle_response("")
 
 
