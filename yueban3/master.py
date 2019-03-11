@@ -93,6 +93,7 @@ async def _send_routine(client_obj, ws):
             await asyncio.wait_for(ws.send(msg), timeout=max_idle)
         except (ConnectionClosed, Exception) as e:
             remove_client(client_id)
+            # TODO
             if not isinstance(e, ConnectionClosed) or True:
                 log.error('send_except', client_id, msg, type(e), traceback.format_exc())
             break
@@ -123,6 +124,7 @@ async def _recv_routine(client_obj, ws):
         except (ConnectionClosed, Exception) as e:
             # 主要是超时或断开
             remove_client(client_id)
+            # TODO
             if not isinstance(e, ConnectionClosed) or True:
                 s = traceback.format_exc()
                 log.info('recv_except', client_id, type(e), s)
@@ -145,7 +147,7 @@ async def _websocket_handler(request, ws):
         log.info('done, pending', done, pending)
     except Exception as e:
         s = traceback.format_exc()
-        log.error('ws_except', client_id, type(e), s)
+        log.error('ws_except', client_id, type(e), s, send_task.done(), send_task.cancelled(), recv_task.done(), recv_task.cancelled())
     finally:
         try:
             if not client_obj.shut:
