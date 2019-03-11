@@ -42,17 +42,23 @@ async def post(url, bs, timeout=60):
     发送：字节流
     接收: 字节流
     """
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, data=bs, timeout=timeout) as resp:
-                if resp.status != 200:
-                    raise RuntimeError('bad status:{}'.format(resp.status))
-                rbs = await resp.read()
-                return rbs
-    except Exception as e:
-        import traceback
-        s = traceback.format_exc()
-        log.error("http_post", url, bs, type(e), s)
+    while 1:
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, data=bs, timeout=timeout) as resp:
+                    if resp.status != 200:
+                        raise RuntimeError('bad status:{}'.format(resp.status))
+                    rbs = await resp.read()
+                    return rbs
+        except asyncio.CancelledError:
+            log.error('retry_post', url, bs)
+            await asyncio.sleep(0)
+            continue
+        except Exception as e:
+            import traceback
+            s = traceback.format_exc()
+            log.error("http_post", url, bs, type(e), s)
+            break
 
 
 async def call_specific_master(master_id, path, args):
