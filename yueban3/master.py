@@ -136,8 +136,8 @@ async def _websocket_handler(request, ws):
     client_obj = _add_client(client_id, ip)
     try:
         client_obj.send_queue = asyncio.Queue(SEND_QUEUE_SIZE)
-        send_task = asyncio.ensure_future(_send_routine(client_obj, ws))
-        recv_task = asyncio.ensure_future(_recv_routine(client_obj, ws))
+        send_task = _send_routine(client_obj, ws)
+        recv_task = _recv_routine(client_obj, ws)
         client_obj.send_task = send_task
         client_obj.recv_task = recv_task
         log.info('begin', client_id, ip, len(_clients), _schedule_cnt)
