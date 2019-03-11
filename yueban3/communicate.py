@@ -47,12 +47,12 @@ async def post(url, bs, timeout=60):
             async with session.post(url, data=bs, timeout=timeout) as resp:
                 if resp.status != 200:
                     raise RuntimeError('')
-                bs = await resp.read()
-                return bs
+                rbs = await resp.read()
+                return rbs
     except Exception as e:
         import traceback
         s = traceback.format_exc()
-        log.error("http_post", url, bs, e, s)
+        log.error("http_post", url, bs, type(e), s)
 
 
 async def call_specific_master(master_id, path, args):
