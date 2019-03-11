@@ -42,7 +42,7 @@ async def post(url, bs, timeout=60):
     发送：字节流
     接收: 字节流
     """
-    while 1:
+    for _ in range(2):
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, data=bs, timeout=timeout) as resp:
