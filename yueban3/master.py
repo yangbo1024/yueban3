@@ -91,6 +91,9 @@ async def _send_routine(client_obj, ws):
                 break
             # 如果被关闭，发送会抛错
             await asyncio.wait_for(ws.send(msg), timeout=max_idle)
+        except asyncio.CancelledError:
+            log.error('send_cancelled', client_id)
+            raise
         except (ConnectionClosed, Exception) as e:
             remove_client(client_id)
             # TODO
@@ -121,6 +124,9 @@ async def _recv_routine(client_obj, ws):
                 if data is not None:
                     # data不为None，代表一应一答，类似RPC
                     client_obj.put_s2c(data)
+        except asyncio.CancelledError:
+            log.error('recv_cancelled', client_id)
+            raise
         except (ConnectionClosed, Exception) as e:
             # 主要是超时或断开
             remove_client(client_id)
@@ -147,7 +153,7 @@ async def _websocket_handler(request, ws):
         log.info('done, pending', done, pending)
     except Exception as e:
         s = traceback.format_exc()
-        log.error('ws_except', client_id, type(e), s, send_task.done(), send_task.cancelled(), recv_task.done(), recv_task.cancelled())
+        log.error('ws_except', client_id, type(e), s)
     finally:
         try:
             if not client_obj.shut:
