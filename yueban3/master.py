@@ -149,7 +149,7 @@ async def _websocket_handler(request, ws):
         client_obj.send_task = asyncio.shield(send_task)
         client_obj.recv_task = asyncio.shield(recv_task)
         log.info('begin', client_id, ip, len(_clients), _schedule_cnt)
-        await asyncio.gather(*[send_task, recv_task])
+        await asyncio.gather(*[client_obj.send_task, client_obj.recv_task])
     except Exception as e:
         s = traceback.format_exc()
         log.error('ws_except', client_id, type(e), s)
