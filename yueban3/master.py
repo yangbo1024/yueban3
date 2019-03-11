@@ -16,9 +16,6 @@ from sanic import app
 from sanic.app import ConnectionClosed
 
 
-SEND_QUEUE_SIZE = 32
-
-
 _web_app = globals().setdefault('_web_app', app.Sanic())
 _master_id = globals().setdefault('_master_id', '')
 _clients = globals().setdefault('_clients', {})
@@ -39,16 +36,10 @@ class Client(object):
     def __init__(self, client_id, ip):
         self.client_id = client_id
         self.ip = ip
-        self.send_queue = None
-        self.create_time = int(time.time())
+        self.ctime = int(time.time())
         self.shut = False       # 是否服务器主动关闭
-        self.closed = False     # 是否已经被关闭
-
-    def put_s2c(self, msg):
-        try:
-            self.send_queue.put_nowait(msg)
-        except Exception as e:
-            log.error('put_s2c', e, self.client_id, msg)
+        self.task = None
+        self.ws = None
 
 
 def _add_client(client_id, ip):
@@ -59,75 +50,35 @@ def _add_client(client_id, ip):
 
 def remove_client(client_id, shut=False):
     client_obj = _clients.get(client_id)
-    if not client_obj:
-        return False
-    client_obj.shut = shut
-    client_obj.closed = True
-    try:
-        client_obj.send_queue.put_nowait(None)
-    except Exception as e:
-        s = traceback.format_exc()
-        log.error("remove_client", e, s)
-    _clients.pop(client_id)
-    return True
+    if client_obj:
+        _clients.pop(client_id)
+    return client_obj
 
 
-async def _send_routine(client_obj, ws):
+async def _serve(client_obj):
     master_config = configuration.get_master_config()
     cfg = master_config[_master_id]
     max_idle = cfg["max_idle"]
     client_id = client_obj.client_id
-    queue = client_obj.send_queue
-    msg = None
-    while not client_obj.closed:
-        try:
-            msg = await queue.get()
-            if msg is None:
-                # 只有服务器主动断开才会是None，仅仅在remove_client中出现
-                # 不直接cancel这个task的目的是为了保证整个数据都发出去再退出，避免发送一半断开的情况
-                log.info('sendq_none', client_id)
-                break
-            # 如果被关闭，发送会抛错
-            await asyncio.wait_for(ws.send(msg), timeout=max_idle)
-        except asyncio.CancelledError:
-            log.error('send_cancelled', client_id)
-            raise
-        except (ConnectionClosed, Exception) as e:
-            remove_client(client_id)
-            # TODO
-            if not isinstance(e, ConnectionClosed) or True:
-                log.error('send_except', client_id, msg, type(e), traceback.format_exc())
-            break
-
-
-async def _recv_routine(client_obj, ws):
-    """
-    接收处理客户端协议
-    """
-    master_config = configuration.get_master_config()
-    cfg = master_config[_master_id]
-    max_idle = cfg["max_idle"]
-    client_id = client_obj.client_id
-    while not client_obj.closed:
+    ip = client_obj.ip
+    ws = client_obj.ws
+    while 1:
         try:
             data = await asyncio.wait_for(ws.recv(), timeout=max_idle)
             args = {
-                "id": client_id,
-                "ip": client_obj.ip,
-                "data": data,
+                'id': client_id,
+                'ip': ip,
+                'data': data,
             }
-            if not client_obj.closed:
                 # 没有被关闭才发协议
-                data = await communicate.call_worker(communicate.WorkerPath.Proto, args)
-                if data is not None:
-                    # data不为None，代表一应一答，类似RPC
-                    client_obj.put_s2c(data)
+            data = await communicate.call_worker(communicate.WorkerPath.Proto, args)
+            if data is not None:
+                # data不为None，代表一应一答，类似RPC
+                await asyncio.wait_for(ws.send(data), timeout=max_idle)
         except asyncio.CancelledError:
-            log.error('recv_cancelled', client_id)
-            raise
+            log.info("client_cancel", client_id)
+            break
         except (ConnectionClosed, Exception) as e:
-            # 主要是超时或断开
-            remove_client(client_id)
             # TODO
             if not isinstance(e, ConnectionClosed) or True:
                 s = traceback.format_exc()
@@ -140,27 +91,23 @@ async def _websocket_handler(request, ws):
     ip = request.headers.get('X-Real-IP') or request.ip
     client_id = gen_client_id()
     client_obj = _add_client(client_id, ip)
+    client_obj.ws = ws
+    log.info('begin', client_id, ip, len(_clients))
+    task = asyncio.ensure_future(_serve(client_obj))
+    client_obj.task = task
     try:
-        client_obj.send_queue = asyncio.Queue(SEND_QUEUE_SIZE)
-        send_task = _send_routine(client_obj, ws)
-        recv_task = _recv_routine(client_obj, ws)
-        log.info('begin', client_id, ip, len(_clients), _schedule_cnt)
-        await asyncio.gather(*[send_task, recv_task])
+        await asyncio.wait([task])
+        # 主要是超时或断开
+        remove_client(client_id)
+        if not client_obj.shut:
+            args = {
+                "id": client_id,
+                "ip": client_obj.ip,
+            }
+            await communicate.call_worker(communicate.WorkerPath.ClientClosed, args)
+        log.info('end', client_id, len(_clients))
     except Exception as e:
-        s = traceback.format_exc()
-        log.error('ws_except', client_id, type(e), s)
-    finally:
-        try:
-            if not client_obj.shut:
-                args = {
-                    "id": client_id,
-                    "ip": client_obj.ip,
-                }
-                await communicate.call_worker(communicate.WorkerPath.ClientClosed, args)
-        except Exception as e:
-            s = traceback.format_exc()
-            log.error('close_except', ip, client_id, type(e), s)
-        log.info('end', client_id, client_obj.shut)
+        log.error('ws_handler', client_id, type(e))
 
 
 # worker-logic to master-gate
@@ -171,20 +118,29 @@ async def _proto_handler(request):
     if not client_ids:
         # broadcast
         client_ids = _clients.keys()
+    ts = []
     for client_id in client_ids:
         client_obj = _clients.get(client_id)
         if not client_obj:
             continue
-        client_obj.put_s2c(data)
+        t = client_obj.ws.send(data)
+        ts.append(t)
+    if ts:
+        await asyncio.wait(ts)
     return utility.pack_pickle_response("")
 
 
 async def _close_client_handler(request):
     msg = await utility.unpack_pickle_request(request)
     client_id = msg["id"]
-    ok = remove_client(client_id, shut=True)
-    log.info('close_client', client_id, ok)
-    return utility.pack_pickle_response(ok)
+    client_obj = remove_client(client_id, True)
+    log.info('close_client', client_id)
+    if client_obj and not client_obj.task.done():
+        try:
+            client_obj.task.cancel()
+        except Exception as e:
+            log.error('close_cancel', client_id, type(e))
+    return utility.pack_pickle_response('')
 
 
 async def _hotfix_handler(request):
