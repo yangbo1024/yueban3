@@ -115,7 +115,7 @@ async def _recv_routine(client_obj, ws):
                 "data": data,
             }
             if not client_obj.closed:
-                # 已经被关闭，不再发协议
+                # 没有被关闭才发协议
                 data = await communicate.call_worker(communicate.WorkerPath.Proto, args)
                 if data is not None:
                     # data不为None，代表一应一答，类似RPC
@@ -140,11 +140,11 @@ async def _websocket_handler(request, ws):
         recv_task = asyncio.ensure_future(_recv_routine(client_obj, ws))
         client_obj.send_task = send_task
         client_obj.recv_task = recv_task
-        log.info('begin', ip, client_id, len(_clients), _schedule_cnt)
+        log.info('begin', client_id, ip, len(_clients), _schedule_cnt)
         await asyncio.wait([send_task, recv_task], return_when=asyncio.FIRST_COMPLETED)
     except Exception as e:
         s = traceback.format_exc()
-        log.error('ws_except', type(e), s)
+        log.error('ws_except', client_id, type(e), s)
     finally:
         try:
             if not client_obj.shut:
@@ -156,7 +156,7 @@ async def _websocket_handler(request, ws):
         except Exception as e:
             s = traceback.format_exc()
             log.error('close_except', ip, client_id, type(e), s)
-        log.info('end', ip, client_id, client_obj.shut)
+        log.info('end', client_id, client_obj.shut)
 
 
 # worker-logic to master-gate
