@@ -39,8 +39,6 @@ class Client(object):
     def __init__(self, client_id, ip):
         self.client_id = client_id
         self.ip = ip
-        self.send_task = None
-        self.recv_task = None
         self.send_queue = None
         self.create_time = int(time.time())
         self.shut = False       # 是否服务器主动关闭
@@ -146,10 +144,8 @@ async def _websocket_handler(request, ws):
         client_obj.send_queue = asyncio.Queue(SEND_QUEUE_SIZE)
         send_task = _send_routine(client_obj, ws)
         recv_task = _recv_routine(client_obj, ws)
-        client_obj.send_task = asyncio.shield(send_task)
-        client_obj.recv_task = asyncio.shield(recv_task)
         log.info('begin', client_id, ip, len(_clients), _schedule_cnt)
-        await asyncio.gather(*[client_obj.send_task, client_obj.recv_task])
+        await asyncio.gather(*[send_task, recv_task])
     except Exception as e:
         s = traceback.format_exc()
         log.error('ws_except', client_id, type(e), s)
