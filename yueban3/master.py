@@ -142,16 +142,20 @@ async def _websocket_handler(request, ws):
         client_obj.recv_task = recv_task
         log.info('begin', ip, client_id, len(_clients), _schedule_cnt)
         await asyncio.wait([send_task, recv_task], return_when=asyncio.FIRST_COMPLETED)
-        if not client_obj.shut:
-            args = {
-                "id": client_id,
-                "ip": client_obj.ip,
-            }
-            await communicate.call_worker(communicate.WorkerPath.ClientClosed, args)
     except Exception as e:
         s = traceback.format_exc()
         log.error('ws_except', type(e), s)
     finally:
+        try:
+            if not client_obj.shut:
+                args = {
+                    "id": client_id,
+                    "ip": client_obj.ip,
+                }
+                await communicate.call_worker(communicate.WorkerPath.ClientClosed, args)
+        except Exception as e:
+            s = traceback.format_exc()
+            log.error('close_except', ip, client_id, type(e), s)
         log.info('end', ip, client_id, client_obj.shut)
 
 
