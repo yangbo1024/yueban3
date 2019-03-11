@@ -104,7 +104,7 @@ async def _websocket_handler(request, ws):
     task = asyncio.ensure_future(_serve(client_obj))
     client_obj.task = task
     try:
-        await asyncio.wait([task])
+        await task
     finally:
         # 主要是超时或断开
         _pop_client(client_id)
