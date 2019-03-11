@@ -46,11 +46,13 @@ async def post(url, bs, timeout=60):
         async with aiohttp.ClientSession() as session:
             async with session.post(url, data=bs, timeout=timeout) as resp:
                 if resp.status != 200:
-                    raise RuntimeError('http_post:{},{},{}'.format(url, bs, resp.status))
+                    raise RuntimeError('')
                 bs = await resp.read()
                 return bs
     except Exception as e:
-        log.error("http_post", url, bs, e)
+        import traceback
+        s = traceback.format_exc()
+        log.error("http_post", url, bs, e, s)
 
 
 async def call_specific_master(master_id, path, args):
