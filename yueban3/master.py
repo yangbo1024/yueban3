@@ -113,7 +113,8 @@ async def _websocket_handler(request, ws):
                 "id": client_id,
                 "ip": client_obj.ip,
             }
-            await communicate.call_worker(communicate.WorkerPath.ClientClosed, args)
+            path = communicate.WorkerPath.ClientClosed
+            await asyncio.shield(communicate.call_worker(path, args))
         log.info('end', client_id, len(_clients))
 
 
