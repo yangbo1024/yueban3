@@ -54,18 +54,18 @@ def _pop_client(client_id):
     client_obj = _clients.get(client_id)
     if client_obj:
         _clients.pop(client_id)
+        client_obj.ws = None
     return client_obj
 
 
-async def _c2s(ws, args, max_idle):
+async def _c2s(client_obj, args, max_idle):
     # 发协议
-    try:
-        data = await communicate.call_worker(communicate.WorkerPath.Proto, args)
-        if data is not None:
-            # data不为None，代表一应一答，类似RPC
-            await asyncio.wait_for(ws.send(data), timeout=max_idle)
-    finally:
-        pass
+    path = communicate.WorkerPath.Proto
+    data = await asyncio.shield(communicate.call_worker(path, args))
+    if data is not None:
+        # data不为None，代表一应一答，类似RPC
+        if client_obj.ws:
+            await asyncio.wait_for(client_obj.ws.send(data), timeout=max_idle)
 
 
 async def _serve(client_obj):
@@ -83,8 +83,7 @@ async def _serve(client_obj):
                 'ip': ip,
                 'data': data,
             }
-            task = asyncio.shield(_c2s(ws, args, max_idle))
-            await task
+            await _c2s(client_obj, args, max_idle)
         except asyncio.CancelledError:
             break
         except ConnectionClosed:
@@ -129,7 +128,7 @@ async def _proto_handler(request):
     ts = []
     for client_id in client_ids:
         client_obj = _clients.get(client_id)
-        if not client_obj:
+        if not client_obj or not client_obj.ws:
             continue
         t = client_obj.ws.send(data)
         ts.append(t)
