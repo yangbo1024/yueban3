@@ -104,6 +104,8 @@ async def _websocket_handler(request, ws):
     client_obj.task = task
     try:
         await task
+    except asyncio.CancelledError:
+        pass
     finally:
         # 主要是超时或断开
         _pop_client(client_id)
@@ -113,7 +115,10 @@ async def _websocket_handler(request, ws):
                 "ip": client_obj.ip,
             }
             path = communicate.WorkerPath.ClientClosed
-            await asyncio.shield(communicate.call_worker(path, args))
+            try:
+                await communicate.call_worker(path, args)
+            except asyncio.CancelledError:
+                pass
         log.info('end', client_id, len(_clients))
 
 
