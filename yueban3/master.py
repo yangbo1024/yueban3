@@ -75,6 +75,7 @@ async def _serve(client_obj):
     client_id = client_obj.client_id
     ip = client_obj.ip
     ws = client_obj.ws
+    log.info('begin', client_id, ip, len(_clients))
     while 1:
         try:
             data = await asyncio.wait_for(ws.recv(), timeout=max_idle)
@@ -92,6 +93,18 @@ async def _serve(client_obj):
             s = traceback.format_exc()
             log.info('recv_except', client_id, type(e), s)
             break
+    # 退出、清理
+    _pop_client(client_id)
+    if not client_obj.shut:
+        client_obj.shut = True
+        args = {
+            "id": client_id,
+            "ip": client_obj.ip,
+        }
+        path = communicate.WorkerPath.ClientClosed
+        await communicate.call_worker(path, args)
+        client_obj.task = None
+    log.info('end', client_id)
 
 
 @_web_app.websocket('/ws')
@@ -100,26 +113,18 @@ async def _websocket_handler(request, ws):
     client_id = gen_client_id()
     client_obj = _add_client(client_id, ip, ws)
     log.info('begin', client_id, ip, len(_clients))
-    task = asyncio.ensure_future(_serve(client_obj))
+    task = asyncio.shield(_serve(client_obj))
     client_obj.task = task
     try:
         await task
-    except asyncio.CancelledError:
-        pass
-    finally:
-        # 主要是超时或断开
-        _pop_client(client_id)
-        if not client_obj.shut:
-            args = {
-                "id": client_id,
-                "ip": client_obj.ip,
-            }
-            path = communicate.WorkerPath.ClientClosed
+    except Exception as e:
+        if not isinstance(e, asyncio.CancelledError):
+            log.error('ws_error', type(e), client_id)
+        if client_obj.task and not client_obj.task.done():
             try:
-                await communicate.call_worker(path, args)
-            except asyncio.CancelledError:
+                client_obj.task.cancel()
+            finally:
                 pass
-        log.info('end', client_id, len(_clients))
 
 
 # worker-logic to master-gate
