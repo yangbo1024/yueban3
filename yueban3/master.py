@@ -112,7 +112,6 @@ async def _websocket_handler(request, ws):
     ip = request.headers.get('X-Real-IP') or request.ip
     client_id = gen_client_id()
     client_obj = _add_client(client_id, ip, ws)
-    log.info('begin', client_id, ip, len(_clients))
     task = asyncio.shield(_serve(client_obj))
     client_obj.task = task
     try:
