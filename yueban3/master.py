@@ -114,16 +114,7 @@ async def _websocket_handler(request, ws):
     client_obj = _add_client(client_id, ip, ws)
     task = asyncio.shield(_serve(client_obj))
     client_obj.task = task
-    try:
-        await task
-    except Exception as e:
-        if not isinstance(e, asyncio.CancelledError):
-            log.error('ws_error', type(e), client_id)
-        if client_obj.task and not client_obj.task.done():
-            try:
-                client_obj.task.cancel()
-            finally:
-                pass
+    await task
 
 
 # worker-logic to master-gate
@@ -142,10 +133,7 @@ async def _proto_handler(request):
         t = client_obj.ws.send(data)
         ts.append(t)
     if ts:
-        try:
-            await asyncio.wait(ts)
-        except Exception as e:
-            log.error('proto_handler', type(e), len(client_ids), data)
+        await asyncio.wait(ts)
     return utility.pack_pickle_response("")
 
 
@@ -157,12 +145,10 @@ async def _close_client_handler(request):
     ret = utility.pack_pickle_response('')
     if not client_obj:
         return ret
-    client_obj.shut = True
-    if client_obj.task and not client_obj.task.done():
-        try:
+    if not client_obj.shut:
+        client_obj.shut = True
+        if client_obj.task and not client_obj.task.done():
             client_obj.task.cancel()
-        except Exception as e:
-            log.error('close_cancel', client_id, type(e))
     return ret
 
 
