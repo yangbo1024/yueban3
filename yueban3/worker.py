@@ -264,7 +264,7 @@ def async_execute(coro):
     _async_tasks.put_nowait(coro)
 
 
-def run(cfg_path, worker_app, reuse_port=False, settings={'KEEP_ALIVE': False}, **kwargs):
+def run(cfg_path, worker_app, reuse_port=False, settings={}, **kwargs):
     """
     :param cfg_path: 配置文件路径
     :param worker_app: Worker的子类

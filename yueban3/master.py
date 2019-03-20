@@ -255,7 +255,7 @@ async def _initialize(app, loop):
     await log.initialize()
 
 
-def run(cfg_path, master_id, settings={'KEEP_ALIVE': False}, **kwargs):
+def run(cfg_path, master_id, settings={}, **kwargs):
     """
     :param cfg_path: 配置文件路径
     :param master_id: 配置文件中的master服务的id
