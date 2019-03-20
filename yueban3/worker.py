@@ -155,6 +155,7 @@ async def _on_shutdown(app, loop):
             pass
     await cache.cleanup()
     await storage.cleanup()
+    await communicate.cleanup()
     # 停止log是最后一步
     await log.cleanup()
 

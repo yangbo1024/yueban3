@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 """
 框架:
-    基于Python 3.5+, aiohttp，aioredis, motor
+    基于Python 3.5+, sanic, aiohttp，aioredis, motor
 
 配置：
     参见configuration.py配置模板

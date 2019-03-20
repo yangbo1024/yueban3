@@ -11,6 +11,8 @@ import pickle
 import random
 from . import log
 
+_client_session = None
+
 
 class MasterPath(object):
     Proto = "/__/proto"
@@ -36,19 +38,29 @@ def loads(bs):
     return pickle.loads(bs)
 
 
+async def initialize():
+    global _client_session
+    _client_session = aiohttp.ClientSession()
+
+
+async def cleanup():
+    global _client_session
+    await _client_session.close()
+
+
 async def post(url, bs, timeout=60):
     """
     POST请求，不用连接池，避免一直发送数据导致因为keep-alive连接不能及时优雅退出
     发送：字节流
     接收: 字节流
     """
+    global _client_session
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, data=bs, timeout=timeout) as resp:
-                if resp.status != 200:
-                    raise RuntimeError('bad status:{}'.format(resp.status))
-                rbs = await resp.read()
-                return rbs
+        resp = await _client_session.post(url, data=bs, timeout=timeout)
+        if resp.status != 200:
+            raise RuntimeError('bad status:{}'.format(resp.status))
+        rbs = await resp.read()
+        return rbs
     except asyncio.CancelledError:
         log.error('post_cancelled', url, bs)
     except Exception as e:
